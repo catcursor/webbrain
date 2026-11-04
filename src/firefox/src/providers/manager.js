@@ -297,13 +297,13 @@ export class ProviderManager {
    * defaults do not stay visible forever for existing users.
    */
   async load() {
-    const data = await chrome.storage.local.get(['providers', 'activeProvider', 'selfHostedPrivacyV1']);
+    const data = await browser.storage.local.get(['providers', 'activeProvider', 'selfHostedPrivacyV1']);
     const state = selfHostedProviders(data.providers, data.activeProvider);
     this.providers.clear();
     for (const [id, config] of Object.entries(state.providers)) this.providers.set(id, this._createProvider(id, config));
     this.activeProviderId = state.activeProvider;
     if (data.selfHostedPrivacyV1 !== true) {
-      await chrome.storage.local.set({ selfHostedPrivacyV1: true,
+      await browser.storage.local.set({ selfHostedPrivacyV1: true,
         helpImproveWebBrain: false, profileSyncEnabled: false,
         userMemoryAutoCaptureEnabled: false, userMemoryFormCaptureEnabled: false,
         tracingEnabled: false, feedbackDiagnosticsEnabled: false,
@@ -312,7 +312,7 @@ export class ProviderManager {
         wb_memcode_recall_enabled: false, newTabEnabled: false,
         visionModel: null, transcriptionModel: null, imageGenModel: null,
       });
-      await chrome.storage.local.remove(['webbrainShareOutboxV1', 'cloudRuntimeOutboxV1',
+      await browser.storage.local.remove(['webbrainShareOutboxV1', 'cloudRuntimeOutboxV1',
         'webbrainCloudRuntimeOutboxV1', 'webbrainDeviceGuid', 'profileSyncToken',
         'wb_user_memory_extraction_queue_v1', 'wb_memcode_oauth_v1']);
     }

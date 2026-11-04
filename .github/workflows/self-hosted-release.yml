@@ -33,6 +33,7 @@ jobs:
             test
             docs
             LICENSES
+            firefox-companion
           sparse-checkout-cone-mode: true
       - uses: actions/setup-node@v4
         with:
@@ -42,10 +43,12 @@ jobs:
         run: npm ci
       - name: Privacy and browser-safety regressions
         run: npm run test:privacy
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox
       - name: Test the unpacked extension against an owned mock API
         run: npm run test:privacy:browser
+      - name: Test Firefox provider settings against an owned mock API
+        run: npm run test:privacy:firefox
       - name: Build Chrome and Firefox packages
         run: npm run build:privacy
       - name: Publish packages to Releases

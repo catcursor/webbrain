@@ -17,9 +17,16 @@ function storage(seed = {}) {
     async remove(keys) { for (const key of Array.isArray(keys) ? keys : [keys]) delete data[key]; },
   };
 }
-function setChrome(area) {
-  globalThis.chrome = { storage: { local: area, onChanged: { addListener() {} } }, runtime: {} };
-  globalThis.browser = globalThis.chrome;
+function setChrome(area, flavor = 'chrome') {
+  globalThis.browser = { storage: { local: area, onChanged: { addListener() {} } }, runtime: {} };
+  // Firefox's chrome namespace uses callbacks, unlike its Promise-based browser namespace.
+  const callbackStorage = Object.fromEntries(['get', 'set', 'remove'].map(method => [method, (value, callback) => {
+    const result = area[method](value);
+    if (callback) result.then(callback);
+  }]));
+  globalThis.chrome = flavor === 'firefox'
+    ? { ...globalThis.browser, storage: { ...globalThis.browser.storage, local: callbackStorage } }
+    : globalThis.browser;
 }
 
 for (const browser of ['chrome', 'firefox']) {
@@ -36,7 +43,7 @@ for (const browser of ['chrome', 'firefox']) {
   const { DEFAULT_SKILL_SOURCES, PACKAGED_SKILL_SOURCES, removeRetiredPackagedSkills } = await import(`../src/${browser}/src/agent/skills.js`);
 
   test(`${browser}: fresh install has one empty API card, no hosted fallback or repeat migration writes`, async () => {
-    const area = storage(); setChrome(area);
+    const area = storage(); setChrome(area, browser);
     const manager = new ProviderManager(); await manager.load();
     assert.deepEqual(Object.keys(manager.getAll()), ['custom_openai']);
     assert.equal(manager.activeProviderId, 'custom_openai');
@@ -56,7 +63,7 @@ for (const browser of ['chrome', 'firefox']) {
       openai: { type: 'openai', baseUrl: 'https://api.openai.com/v1', configured: true },
       custom_openai: { baseUrl: 'https://own.example.org/api/v1', configured: true, model: 'mine', shareQueriesForResearch: true },
     }, activeProvider: 'openai', webbrainShareOutboxV1: ['private'], wb_user_memory_extraction_queue_v1: ['private'] });
-    setChrome(area); const manager = new ProviderManager(); await manager.load();
+    setChrome(area, browser); const manager = new ProviderManager(); await manager.load();
     assert.deepEqual(Object.keys(manager.getAll()), ['custom_openai']);
     assert.equal(manager.getActive().config.shareQueriesForResearch, false);
     assert.equal(area.data.webbrainShareOutboxV1, undefined);
@@ -85,7 +92,7 @@ for (const browser of ['chrome', 'firefox']) {
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     try {
-      const area = storage(); setChrome(area);
+      const area = storage(); setChrome(area, browser);
       const manager = new ProviderManager(); await manager.load();
       const endpoint = `http://127.0.0.1:${server.address().port}/v1`;
       await manager.updateProvider('custom_openai', { baseUrl: endpoint, model: 'private-model', apiKey: 'fixture-key', supportsVision: true });
@@ -136,7 +143,7 @@ for (const browser of ['chrome', 'firefox']) {
     });
     await new Promise(resolve => redirector.listen(0, '127.0.0.1', resolve));
     try {
-      setChrome(storage());
+      setChrome(storage(), browser);
       const provider = new OpenAICompatibleProvider({ baseUrl: `http://127.0.0.1:${redirector.address().port}/v1`, model: 'mine', category: 'local' });
       await assert.rejects(provider.chat([{ role: 'user', content: 'PRIVATE_REDIRECT_MARKER' }]));
       assert.equal(destinationRequests, 0);

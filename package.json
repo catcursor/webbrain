@@ -1,6 +1,6 @@
 {
   "name": "webbrain",
-  "version": "46.0.2",
+  "version": "46.0.3",
   "description": "Open-source AI browser agent \u2014 chat with pages, automate tasks, multi-provider LLM support.",
   "private": true,
   "type": "module",
@@ -118,6 +118,7 @@
     "test:guard-overrides": "node --test test/action-guard-user-override.mjs test/guard-direct-override.mjs test/guard-override-persistence.mjs test/publication-user-override.mjs test/resource-mutation-clarification.mjs test/publication-override-target.mjs",
     "test:privacy": "node --test test/self-hosted-privacy.mjs test/provider-message-privacy.mjs test/conversation-persistence.mjs test/build-unpacked.mjs test/guard-policy.mjs",
     "test:privacy:browser": "node test/self-hosted-browser.mjs",
+    "test:privacy:firefox": "node test/self-hosted-firefox.mjs",
     "build:privacy": "python3 scripts/build-private-release.py"
   },
   "devDependencies": {

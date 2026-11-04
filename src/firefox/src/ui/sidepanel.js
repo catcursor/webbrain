@@ -140,13 +140,13 @@ if (globalThis.browser?.storage?.onChanged) {
 // ─── Onboarding (first-launch wizard) ───────────────────────────────
 (async function initOnboarding() {
   document.getElementById('onboarding')?.classList.add('hidden');
-  await chrome.storage.local.set({ onboardingComplete: true, helpImproveWebBrain: false });
+  await browser.storage.local.set({ onboardingComplete: true, helpImproveWebBrain: false });
 })();
 
 const messagesEl = document.getElementById('messages');
 const disposeChatLinkIcons = installChatLinkIcons(messagesEl, {
   fetchImpl: async (url, options) => {
-    const { strictSecretMode } = await chrome.storage.local.get('strictSecretMode');
+    const { strictSecretMode } = await browser.storage.local.get('strictSecretMode');
     if (strictSecretMode === true) throw new Error('Remote chat icons are disabled in Strict Secret Mode.');
     return fetch(url, options);
   },

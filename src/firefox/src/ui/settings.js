@@ -90,9 +90,8 @@ const SUBSCRIPTION_GUIDE_PRODUCTS = Object.freeze({
   kimi: 'Kimi',
 });
 
-// Version shown in the subtitle. Kept here so it only needs one update per
-// release; the subtitle string itself is translated.
-const EXT_VERSION = '46.0.0';
+// Always show the installed package version, including fork releases.
+const EXT_VERSION = browser.runtime.getManifest().version;
 
 const providersContainer = document.getElementById('providers');
 const generalSearchInput = document.getElementById('input-general-search');
