@@ -66,10 +66,23 @@ jobs:
 
           SHA256SUMS verifies the downloads; SOURCE_REVISION.txt identifies the source commit.
           NOTES
-          if gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/self-hosted/* --repo "$REPOSITORY" --clobber
-          else
-            gh release create "$tag" dist/self-hosted/* --repo "$REPOSITORY" \
+          if ! gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" --repo "$REPOSITORY" --draft \
               --target "$GITHUB_SHA" --title "WebBrain self-hosted ${version}" \
-              --notes-file /tmp/release-notes.md --latest
+              --notes-file /tmp/release-notes.md
           fi
+          for asset in dist/self-hosted/*; do
+            uploaded=false
+            for attempt in 1 2 3; do
+              if gh release upload "$tag" "$asset" --repo "$REPOSITORY" --clobber; then
+                uploaded=true
+                break
+              fi
+              sleep 3
+            done
+            if [ "$uploaded" != true ]; then
+              echo "Upload failed: $asset" >&2
+              exit 1
+            fi
+          done
+          gh release edit "$tag" --repo "$REPOSITORY" --draft=false --latest
