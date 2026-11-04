@@ -23,6 +23,7 @@ function setChrome(area) {
 }
 
 for (const browser of ['chrome', 'firefox']) {
+  await import(`../src/${browser}/src/ui/provider-icons.js`);
   const { ProviderManager } = await import(`../src/${browser}/src/providers/manager.js`);
   const { ownEndpoint, selfHostedProviders } = await import(`../src/${browser}/src/providers/self-hosted.js`);
   const { OpenAICompatibleProvider } = await import(`../src/${browser}/src/providers/openai.js`);
