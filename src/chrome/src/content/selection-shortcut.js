@@ -320,8 +320,7 @@
   function resolveInterfaceLanguage(value) {
     const preferred = String(value || '').trim().toLowerCase();
     if (isSupportedTranslationLanguage(preferred)) return preferred;
-    const browserLanguage = String(navigator.language || 'en').slice(0, 2).toLowerCase();
-    return isSupportedTranslationLanguage(browserLanguage) ? browserLanguage : 'en';
+    return 'zh';
   }
 
   function str(key) {
@@ -1007,7 +1006,7 @@
     const options = TRANSLATION_LANGUAGES
       .map((code) => ({ code, label: languageName(code) || code }))
       .sort((a, b) => a.label.localeCompare(b.label, interfaceLanguage));
-    // The placeholder is only chosen when the text is already in the interface
+    // The placeholder is only chosen when the text is already in the target
     // language and the person has not picked a target yet.
     const placeholder = document.createElement('option');
     placeholder.value = '';
@@ -1138,11 +1137,11 @@
 
   async function openCard(kind, opener) {
     if (!snapshot || submitting || !INLINE_ACTIONS.includes(kind)) return;
-    if (kind !== 'translate' && snapshot.text.length > INLINE_MAX_CHARS) {
+    if (snapshot.text.length > INLINE_MAX_CHARS) {
       // Too long for a card: the side panel is the better place to read it. This is
       // decided before anything is awaited, because the panel can only be opened
       // inside the click's user gesture, which the localization wait would outlive.
-      submitSelection(kind, '', interfaceLanguage);
+      submitSelection(kind, '', kind === 'translate' ? 'zh' : interfaceLanguage);
       return;
     }
     // Claim the card before anything is awaited: a second click while the
@@ -1158,7 +1157,7 @@
     cardState = {
       kind,
       status: 'loading',
-      target: kind === 'translate' ? interfaceLanguage : '',
+      target: kind === 'translate' ? 'zh' : '',
       sourceLabel: '',
       quote: kind === 'translate' ? snapshot.text : '',
       text: '',
@@ -1177,15 +1176,6 @@
     // does not dismiss it, and Escape and Enter reach the card's handlers.
     card.focus({ preventScroll: true });
     if (kind === 'translate') {
-      // Long selections go straight to the side panel, where an automatic target
-      // could be a no-op. Require an explicit target rather than guessing.
-      if (snapshot?.text.length > INLINE_MAX_CHARS) {
-        cardState.status = 'idle';
-        cardState.target = '';
-        renderCard();
-        cardParts.target.focus({ preventScroll: true });
-        return;
-      }
       const detected = await detectSourceLanguage(cardState?.quote || '');
       if (requestId !== cardRequestId || !cardState) return;
       cardState.sourceLabel = detected ? languageName(detected) : '';

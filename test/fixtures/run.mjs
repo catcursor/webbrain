@@ -2145,11 +2145,11 @@ for (const [label, sourcePath, manualOpen] of [
     await openInlineCard(page, 'translate');
     let state = await waitForCardStatus(page, 'ready');
     if (state.cardSourceLabel !== 'French'
-        || state.cardTarget !== 'en'
-        || state.cardTargetLabel !== 'English'
+        || state.cardTarget !== 'zh'
+        || state.cardTargetLabel !== 'Chinese'
         || state.cardTargetOptionCount !== 24
         || !/Selected words near the viewport edge/.test(state.cardQuote)
-        || state.cardText !== 'Mock translate answer for en') {
+        || state.cardText !== 'Mock translate answer for zh') {
       throw new Error(`Translate should show source, target, original and translation: ${JSON.stringify(state)}`);
     }
     await page.evaluate(() => window.__webbrainSelectionShortcut.chooseTarget('de'));
@@ -2164,12 +2164,12 @@ for (const [label, sourcePath, manualOpen] of [
     }
   });
 
-  test(`${label}: Translate waits for a target when the text is already in the interface language`, async (page) => {
+  test(`${label}: Translate waits for a target when the text is already Chinese`, async (page) => {
     await setupSelectionShortcut(page, sourcePath, { requiresManualOpen: manualOpen });
-    await page.evaluate(() => { window.__selectionDetectedLanguage = 'en'; });
+    await page.evaluate(() => { window.__selectionDetectedLanguage = 'zh'; });
     await openInlineCard(page, 'translate');
     let state = await waitForCardStatus(page, 'idle');
-    if (state.cardSourceLabel !== 'English' || state.cardTarget !== '' || state.cardTargetLabel !== 'Translate to') {
+    if (state.cardSourceLabel !== 'Chinese' || state.cardTarget !== '' || state.cardTargetLabel !== 'Translate to') {
       throw new Error(`Translate should ask for a target instead of echoing the text: ${JSON.stringify(state)}`);
     }
     if ((await page.evaluate(() => window.__selectionInlineMessages.length)) !== 0) {
@@ -2185,7 +2185,7 @@ for (const [label, sourcePath, manualOpen] of [
 
   test(`${label}: Translate still offers a target list when the language bundle cannot be loaded`, async (page) => {
     await setupSelectionShortcut(page, sourcePath, { requiresManualOpen: manualOpen, failLocalization: true });
-    await page.evaluate(() => { window.__selectionDetectedLanguage = 'en'; });
+    await page.evaluate(() => { window.__selectionDetectedLanguage = 'zh'; });
     await openInlineCard(page, 'translate');
     let state = await waitForCardStatus(page, 'idle');
     const options = await page.evaluate(() => window.__webbrainSelectionShortcut.getState().cardTargetOptions);
@@ -2715,7 +2715,7 @@ for (const [label, sourcePath, manualOpen] of [
     }
   });
 
-  test(`${label}: a long translation waits for a target choice`, async (page) => {
+  test(`${label}: a long translation defaults to Chinese and opens the side panel immediately`, async (page) => {
     await setupSelectionShortcut(page, sourcePath, { requiresManualOpen: manualOpen });
     await page.evaluate(() => {
       const article = document.createElement('article');
@@ -2725,19 +2725,10 @@ for (const [label, sourcePath, manualOpen] of [
     });
     const selected = await selectFixtureText(page, '#long-english-selection');
     await clickRectCenter(page, selected.inlineRects.translate);
-    await page.waitForFunction(() => window.__webbrainSelectionShortcut.getState().cardStatus === 'idle');
-    let state = await page.evaluate(() => ({
-      state: window.__webbrainSelectionShortcut.getState(),
-      messages: window.__selectionMessages,
-    }));
-    if (state.messages.length || state.state.cardTarget !== '') {
-      throw new Error(`a long translation should wait for a target: ${JSON.stringify(state)}`);
-    }
-    await page.evaluate(() => window.__webbrainSelectionShortcut.chooseTarget('de'));
     await page.waitForFunction(() => window.__selectionMessages.length === 1);
-    state = await page.evaluate(() => ({ message: window.__selectionMessages[0], state: window.__webbrainSelectionShortcut.getState() }));
-    if (state.message.language !== 'de' || state.state.cardVisible) {
-      throw new Error(`the chosen target should be handed to the side panel: ${JSON.stringify(state)}`);
+    const state = await page.evaluate(() => ({ message: window.__selectionMessages[0], state: window.__webbrainSelectionShortcut.getState() }));
+    if (state.message.language !== 'zh' || state.state.cardVisible) {
+      throw new Error(`the Chinese translation should be handed to the side panel: ${JSON.stringify(state)}`);
     }
   });
 

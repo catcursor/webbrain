@@ -2,7 +2,7 @@
 export const SELF_HOSTED_PROVIDER_ID = 'custom_openai';
 export const SELF_HOSTED_DEFAULT = Object.freeze({
   type: 'openai', category: 'local', providerName: 'custom-openai',
-  label: 'Custom OpenAI-compatible API', baseUrl: '', apiKey: '', model: '',
+  label: '自定义 OpenAI 兼容接口', baseUrl: '', apiKey: '', model: '',
   configured: false, enabled: true, contextWindow: 65536,
   supportsAskStreaming: true, supportsStreamUsageOptions: true,
   supportsVision: false, inputCostPerMillionUsd: 0, outputCostPerMillionUsd: 0,
@@ -25,6 +25,7 @@ export function ownProvider(config = {}, id = SELF_HOSTED_PROVIDER_ID) {
     type: 'openai', category: 'local', providerName: 'custom-openai',
     shareQueriesForResearch: false, helpImproveWebBrain: false,
   };
+  if (value.label === 'Custom OpenAI-compatible API') value.label = SELF_HOSTED_DEFAULT.label;
   if (value.baseUrl) value.baseUrl = ownEndpoint(value.baseUrl);
   for (const key of ['deviceGuid', 'siteUrl', 'apiKeyUrl', 'requiresApiKey', 'apiKeyHeader', 'sidepanelOnly']) delete value[key];
   if (id !== SELF_HOSTED_PROVIDER_ID) value.duplicateOf = SELF_HOSTED_PROVIDER_ID;

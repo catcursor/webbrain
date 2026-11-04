@@ -4,6 +4,7 @@ import { decisionEnglish, decisionTranslations } from './locales/decision-copy.m
 // Works identically in Chrome MV3 and Firefox MV2.
 
 import en from './locales/en.js';
+import selfHostedChinese from './locales/self-hosted-zh.mjs';
 import { feedbackTranslations } from './feedback-copy.js';
 import { quotaTranslations } from './locales/compass-quota-copy.mjs';
 import { memcodeEnglish } from './locales/memcode-copy.mjs';
@@ -54,8 +55,10 @@ const DICTS = Object.fromEntries(Object.entries({ en, es, fr, tr, zh, ru, uk, ar
     ...(captchaTranslations[code] || {}),
     ...(safeSocialTranslations[code] || {}),
     ...(providerGuideTranslations[code] || {}),
+    ...(code === 'zh' ? selfHostedChinese : {}),
   }]));
 const LS_KEY = 'wbLocale';
+const DEFAULT_UI_LOCALE = 'zh';
 const RTL_LOCALES = new Set(['ar', 'he', 'fa']);
 
 export const LANGUAGES = [
@@ -90,8 +93,7 @@ function detect() {
     const saved = localStorage.getItem(LS_KEY);
     if (saved && DICTS[saved]) return saved;
   } catch { /* storage denied */ }
-  const nav = (globalThis.navigator?.language || 'en').slice(0, 2).toLowerCase();
-  return DICTS[nav] ? nav : 'en';
+  return DEFAULT_UI_LOCALE;
 }
 
 function persistDetectedLocaleIfUnset(code) {
@@ -105,10 +107,21 @@ function persistDetectedLocaleIfUnset(code) {
     const get = api?.storage?.local?.get;
     const set = api?.storage?.local?.set;
     if (typeof get !== 'function' || typeof set !== 'function') return;
-    Promise.resolve(get.call(api.storage.local, { wbLocale: '' })).then((stored) => {
-      const existing = String(stored?.wbLocale || '').trim();
-      if (existing) return;
-      return set.call(api.storage.local, { wbLocale: code });
+    Promise.resolve(get.call(api.storage.local, { wbLocale: '', selfHostedChineseUiV1: false })).then((stored) => {
+      // Apply the personal build's Chinese default once, including upgrades
+      // that previously saved the browser's English locale automatically.
+      const saved = String(stored?.wbLocale || '').trim();
+      const preferred = stored?.selfHostedChineseUiV1 === true && DICTS[saved] ? saved : DEFAULT_UI_LOCALE;
+      try { localStorage.setItem(LS_KEY, preferred); } catch { /* ignore */ }
+      if (preferred !== currentLocale) {
+        currentLocale = preferred;
+        if (typeof document !== 'undefined') {
+          applyDOMTranslations(document);
+          document.dispatchEvent(new CustomEvent('wb-locale-changed', { detail: { code: preferred } }));
+        }
+      }
+      if (stored?.selfHostedChineseUiV1 === true && saved === preferred) return;
+      return set.call(api.storage.local, { wbLocale: preferred, selfHostedChineseUiV1: true });
     }).catch(() => {});
   } catch { /* ignore */ }
 }

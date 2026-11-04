@@ -310,14 +310,17 @@ const pdfResponseTabs = new Set();
 const pdfOcrRequests = new Map();
 function resolveStoredSelectionShortcutLocale(value) {
   return normalizeSelectionShortcutLocale(
-    value || (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+    value || 'zh',
   );
 }
 
 let selectionShortcutLocale = resolveStoredSelectionShortcutLocale('');
-const selectionShortcutLocaleReady = browser.storage.local.get({ wbLocale: '' })
-  .then((stored) => {
-    selectionShortcutLocale = resolveStoredSelectionShortcutLocale(stored?.wbLocale);
+const selectionShortcutLocaleReady = browser.storage.local.get({ wbLocale: '', selfHostedChineseUiV1: false })
+  .then(async (stored) => {
+    selectionShortcutLocale = resolveStoredSelectionShortcutLocale(stored?.selfHostedChineseUiV1 === true ? stored?.wbLocale : 'zh');
+    if (stored?.selfHostedChineseUiV1 !== true) {
+      await browser.storage.local.set({ wbLocale: 'zh', selfHostedChineseUiV1: true });
+    }
   })
   .catch(() => {});
 
@@ -3515,6 +3518,9 @@ async function handleMessage(msg, sender) {
       if (msg.standaloneChat === true && msg.workflowId) {
         throw new Error('Saved workflows are unavailable in standalone Ask mode.');
       }
+      const runProviderId = providerManager.activeProviderId;
+      const memoryOwner = providerManager.providers.get(runProviderId)?.config;
+      const runMemoryIdentity = { providerId: runProviderId, providerBaseUrl: memoryOwner?.baseUrl, providerModel: memoryOwner?.model };
       assertRunCanStart(tabId, msg);
       const isWorkflowRun = !!msg.workflowId;
       const mode = isWorkflowRun ? 'act' : (msg.mode || 'ask');
@@ -3651,7 +3657,7 @@ async function handleMessage(msg, sender) {
             succeeded: runUpdatesSucceeded(updates),
           });
           Object.assign(userMemoryPayload, runMemoryIdentity);
-        userMemoryPayload.conversationId = await agent.getConversationId(tabId);
+          userMemoryPayload.conversationId = await agent.getConversationId(tabId);
           userMemoryTurnContextTaken = true;
           enqueueUserMemoryExtractionAfterTurn(userMemoryPayload);
         }
@@ -3692,6 +3698,9 @@ async function handleMessage(msg, sender) {
     case 'chat_stream': {
       const tabId = msg.tabId || sender.tab?.id;
       if (!tabId) throw new Error('No tab ID');
+      const runProviderId = providerManager.activeProviderId;
+      const memoryOwner = providerManager.providers.get(runProviderId)?.config;
+      const runMemoryIdentity = { providerId: runProviderId, providerBaseUrl: memoryOwner?.baseUrl, providerModel: memoryOwner?.model };
       assertNoActiveTabRun(tabId);
       // The streaming entry point is not routed; "auto" starts read-only.
       const mode = msg.mode && msg.mode !== 'auto' ? msg.mode : 'ask';
@@ -3762,6 +3771,9 @@ async function handleMessage(msg, sender) {
     case 'continue': {
       const tabId = msg.tabId || sender.tab?.id;
       if (!tabId) throw new Error('No tab ID');
+      const runProviderId = providerManager.activeProviderId;
+      const memoryOwner = providerManager.providers.get(runProviderId)?.config;
+      const runMemoryIdentity = { providerId: runProviderId, providerBaseUrl: memoryOwner?.baseUrl, providerModel: memoryOwner?.model };
       assertRunCanStart(tabId, msg);
       const mode = msg.mode || 'ask';
       // An automatic continuation reports the mode it was routed to.

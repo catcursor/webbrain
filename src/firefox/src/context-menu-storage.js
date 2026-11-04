@@ -7,7 +7,7 @@ export const SELECTION_SHORTCUT_ACTIONS = Object.freeze({
   summarize: 'Summarize this selected text clearly and concisely.',
   explain: 'Explain this selected text in plain language.',
   quiz: 'Quiz me on this selected text. Ask one question at a time and wait for my answer.',
-  proofread: 'Proofread this selected text. First verify that the selection is complete enough to edit. Never infer or reconstruct text beyond its boundaries. If an edge is visibly cut mid-word or the passage is otherwise clearly incomplete, say so and ask the user to select the complete passage instead of supplying a corrected version. For a complete selection, tie every claimed error to exact selected wording, distinguish actual errors from optional style suggestions, and provide one complete corrected version that fixes every listed error without unrelated additions.',
+  proofread: 'Proofread this selected text. Keep the corrected passage in its original language, and write explanations and comments in the requested response language. First verify that the selection is complete enough to edit. Never infer or reconstruct text beyond its boundaries. If an edge is visibly cut mid-word or the passage is otherwise clearly incomplete, say so and ask the user to select the complete passage instead of supplying a corrected version. For a complete selection, tie every claimed error to exact selected wording, distinguish actual errors from optional style suggestions, and provide one complete corrected version that fixes every listed error without unrelated additions.',
   humanize: 'Rewrite this selected text so it reads as human writing rather than AI output. Keep every claim, the language, and the author\'s intent; return only the rewritten text.',
 });
 
@@ -53,11 +53,11 @@ export function isSelectionSourceGrounding(value) {
 }
 
 export const SELECTION_TRANSLATION_LANGUAGES = Object.freeze({
+  zh: 'Chinese',
   en: 'English',
   es: 'Spanish',
   fr: 'French',
   tr: 'Turkish',
-  zh: 'Chinese',
   ru: 'Russian',
   uk: 'Ukrainian',
   ar: 'Arabic',

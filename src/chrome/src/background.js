@@ -519,14 +519,17 @@ function isPdfHandlerSender(sender, tabId) {
 
 function resolveStoredSelectionShortcutLocale(value) {
   return normalizeSelectionShortcutLocale(
-    value || (typeof navigator !== 'undefined' ? navigator.language : 'en'),
+    value || 'zh',
   );
 }
 
 let selectionShortcutLocale = resolveStoredSelectionShortcutLocale('');
-const selectionShortcutLocaleReady = chrome.storage.local.get({ wbLocale: '' })
-  .then((stored) => {
-    selectionShortcutLocale = resolveStoredSelectionShortcutLocale(stored?.wbLocale);
+const selectionShortcutLocaleReady = chrome.storage.local.get({ wbLocale: '', selfHostedChineseUiV1: false })
+  .then(async (stored) => {
+    selectionShortcutLocale = resolveStoredSelectionShortcutLocale(stored?.selfHostedChineseUiV1 === true ? stored?.wbLocale : 'zh');
+    if (stored?.selfHostedChineseUiV1 !== true) {
+      await chrome.storage.local.set({ wbLocale: 'zh', selfHostedChineseUiV1: true });
+    }
   })
   .catch(() => {});
 
