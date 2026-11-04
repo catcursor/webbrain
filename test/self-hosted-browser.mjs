@@ -32,9 +32,14 @@ try {
   const external = [];
   context.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith(`http://127.0.0.1:${server.address().port}/`)) external.push(request.url()); });
   const page = await context.newPage();
-  page.on('pageerror', error => failures.push(error.message));
+  page.on('pageerror', error => { failures.push(error.message); console.error('Extension page error:', error.message); });
+  page.on('console', message => { if (message.type() === 'error') console.error('Extension console:', message.text()); });
   await page.goto(`${extensionOrigin}/src/ui/providers.html`);
-  await page.waitForSelector('input[data-provider="custom_openai"][data-key="baseUrl"]', { timeout: 20000 });
+  await page.waitForSelector('input[data-provider="custom_openai"][data-key="baseUrl"]', { state: 'attached', timeout: 20000 }).catch(async error => {
+    console.error('Providers DOM:', await page.locator('#providers').innerHTML());
+    console.error('Background state:', await page.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'get_providers' })));
+    throw error;
+  });
   assert.equal(await page.locator('.provider-card[data-provider="webbrain_cloud"]').count(), 0);
   const response = await page.evaluate(async ({ endpoint }) => {
     const send = (action, values = {}) => chrome.runtime.sendMessage({ target: 'background', action, ...values });
