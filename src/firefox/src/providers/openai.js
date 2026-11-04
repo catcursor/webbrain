@@ -1,8 +1,9 @@
+const fetchWithTimeout = (url, options = {}, ...rest) => ownApiTransport(url, { ...options, credentials: 'omit', redirect: 'error' }, ...rest);
 import { BaseLLMProvider } from './base.js';
 import { openRouterReplayIdentity, openRouterReplayItems, projectOpenRouterReplay, accumulateReasoningDetails } from './openrouter-replay.js';
 import { normalizeQwenToolResult, normalizeQwenToolStream } from './qwen-tool-calls.js';
 import { normalizeDolphinPromptedResult, normalizeDolphinPromptedStream } from './dolphin-prompted-tools.js';
-import { fetchWithTimeout } from './fetch-timeout.js';
+import { fetchWithTimeout as ownApiTransport } from './fetch-timeout.js';
 import {
   baseModelNameSniffedVision,
   isNewOpenAIContractConfig,
@@ -71,7 +72,8 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
   }
 
   get baseUrl() {
-    let baseUrl = String(this.config.baseUrl || 'https://api.openai.com/v1').trim();
+    if (!String(this.config.baseUrl || '').trim()) throw new Error('Configure your own OpenAI-compatible API Base URL in Providers.');
+    let baseUrl = String(this.config.baseUrl || '').trim();
     const vertexLocation = String(this.config.location || '').trim();
     const replacements = {
       account_id: {
@@ -270,108 +272,9 @@ export class OpenAICompatibleProvider extends BaseLLMProvider {
     return this._opencodeSessionFallback;
   }
 
-  async sendRuntimeEvents(sessionId, events, { timeoutMs = 2500 } = {}) {
-    if (String(this.config.providerName || '').toLowerCase() !== 'webbrain-cloud') {
-      return { ok: false, retryable: false, status: 0 };
-    }
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), Math.max(250, timeoutMs)) : null;
-    try {
-      const response = await fetchWithTimeout(`${this.baseUrl}/improvement/runtime-events`, {
-        method: 'POST',
-        headers: this._headers(),
-        body: JSON.stringify({ session_id: String(sessionId || ''), events }),
-        ...(controller ? { signal: controller.signal } : {}),
-      });
-      if (response.ok) return { ok: true, retryable: false, status: response.status };
-      try { await response.text(); } catch {}
-      return {
-        ok: false,
-        retryable: response.status === 408 || response.status === 429 || response.status >= 500,
-        status: response.status,
-      };
-    } catch {
-      return { ok: false, retryable: true, status: 0 };
-    } finally {
-      if (timer != null) clearTimeout(timer);
-    }
-  }
-
-  /**
-   * Transport for the voluntary per-provider "share queries for research"
-   * outbox. Only ever called on the WebBrain Compass provider instance (the
-   * share outbox routes through it because the backend lives on the WebBrain
-   * API). Consent is forced on for this call: the share_ session is what the
-   * user opted into by enabling the per-provider toggle, independent of the
-   * global Help Improve WebBrain switch.
-   */
-  async sendShareGeneration(sessionId, payload, { timeoutMs = 4000 } = {}) {
-    if (String(this.config.providerName || '').toLowerCase() !== 'webbrain-cloud') {
-      return { ok: false, retryable: false, status: 0 };
-    }
-    // Persisted opt-ins and queued entries must also honor native permission
-    // revocation from Firefox's extension settings before any upload.
-    try {
-      if (!await browser.permissions.contains({ data_collection: RESEARCH_DATA_COLLECTION })) {
-        return { ok: false, retryable: false, status: 0 };
-      }
-    } catch {
-      return { ok: false, retryable: false, status: 0 };
-    }
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), Math.max(250, timeoutMs)) : null;
-    try {
-      const response = await fetchWithTimeout(`${this.baseUrl}/improvement/generations`, {
-        method: 'POST',
-        headers: this._headers({ helpImprove: '1' }),
-        body: JSON.stringify({ session_id: String(sessionId || ''), ...payload }),
-        ...(controller ? { signal: controller.signal } : {}),
-      });
-      if (response.ok) return { ok: true, retryable: false, status: response.status };
-      try { await response.text(); } catch {}
-      return {
-        ok: false,
-        retryable: response.status === 408 || response.status === 429 || response.status >= 500,
-        status: response.status,
-      };
-    } catch {
-      return { ok: false, retryable: true, status: 0 };
-    } finally {
-      if (timer != null) clearTimeout(timer);
-    }
-  }
-
-  async sendShareDiagnostic(sessionId, diagnostic, { timeoutMs = 4000 } = {}) {
-    if (String(this.config.providerName || '').toLowerCase() !== 'webbrain-cloud') {
-      return { ok: false, retryable: false, status: 0 };
-    }
-    try {
-      if (!await browser.permissions.contains({ data_collection: RESEARCH_DATA_COLLECTION })) {
-        return { ok: false, retryable: false, status: 0 };
-      }
-    } catch {
-      return { ok: false, retryable: false, status: 0 };
-    }
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = controller ? setTimeout(() => controller.abort(), Math.max(250, timeoutMs)) : null;
-    try {
-      const response = await fetchWithTimeout(`${this.baseUrl}/improvement/diagnostic-traces`, {
-        method: 'POST',
-        headers: this._headers({ helpImprove: '1' }),
-        body: JSON.stringify({ session_id: String(sessionId || ''), diagnostic }),
-        ...(controller ? { signal: controller.signal } : {}),
-      });
-      if (response.ok) return { ok: true, retryable: false, status: response.status };
-      try { await response.text(); } catch {}
-      // Keep the durable outbox entry while an older Cloud deployment lacks
-      // this newer endpoint; it will be retried after the server rolls out.
-      return { ok: false, retryable: response.status === 404 || response.status === 408 || response.status === 429 || response.status >= 500, status: response.status };
-    } catch {
-      return { ok: false, retryable: true, status: 0 };
-    } finally {
-      if (timer != null) clearTimeout(timer);
-    }
-  }
+  async sendRuntimeEvents() { return { ok: false, retryable: false, status: 0 }; }
+  async sendShareGeneration() { return { ok: false, retryable: false, status: 0 }; }
+  async sendShareDiagnostic() { return { ok: false, retryable: false, status: 0 }; }
 
   /**
    * Newer OpenAI models (gpt-5 and the o-series) reject `max_tokens` and any

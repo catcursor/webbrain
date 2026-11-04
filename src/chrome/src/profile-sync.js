@@ -230,12 +230,8 @@ export class ProfileSyncManager {
     const meta = portable.meta;
     return { version: 1, memory: normalizeUserMemoryStore(s[USER_MEMORY_STORAGE_KEY]), tombstones: meta.tombstones || {}, providers: portable.providers, activeProvider: portable.activeProvider, auxiliaryProviders: { visionModel: s.visionModel || null, transcriptionModel: s.transcriptionModel || null, imageGenModel: s.imageGenModel || null }, profile: { enabled: !!s.profileEnabled, text: s.profileText || '' }, meta: { providersAt: meta.providersAt || 0, providerItemsAt: meta.providerItemsAt, activeProviderAt: meta.activeProviderAt, auxiliaryItemsAt: meta.auxiliaryItemsAt, profileAt: meta.profileAt || 0, memoryAt: meta.memoryAt || 0 } };
   }
-  async request(path, options = {}) {
-    const s = await this.storage.get(PROFILE_SYNC_KEYS.token); const token = s[PROFILE_SYNC_KEYS.token];
-    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }; if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`${API}${path}`, { ...options, headers }); const body = res.status === 204 ? null : await res.json().catch(() => ({}));
-    if (!res.ok) { const e = new Error(body?.error?.message || `Sync request failed (${res.status})`); e.status = res.status; e.body = body; throw e; } return { body, res };
-  }
+  async request() { throw new Error('Cloud sync is removed from this build.'); }
+
   async authStart(email) { const s = await this.storage.get(PROFILE_SYNC_KEYS.deviceGuid); const verifier = randomB64(32); const r = await this.request('/auth/start', { method: 'POST', body: JSON.stringify({ email, device_guid: s[PROFILE_SYNC_KEYS.deviceGuid], verifier }) }); return { ...r.body, verifier }; }
   async authStatus(challengeId, verifier) { const q = new URLSearchParams({ challenge_id: challengeId }); const r = await this.request(`/auth/status?${q}`, { headers: { 'X-WebBrain-Sync-Verifier': verifier } }); if (r.body.token) await this.storage.set({ [PROFILE_SYNC_KEYS.token]: r.body.token }); return r.body; }
   async unlock(password, create = false) { this.sessionGeneration++; this.password = password; this.status = 'syncing'; try { await this.sync({ create }); this.status = 'current'; } catch (e) { this.password = null; this.key = null; this.status = e.status === 404 ? 'empty' : [402, 403].includes(e.status) ? 'subscription' : e instanceof TypeError ? 'offline' : 'error'; throw e; } return this.state(); }

@@ -118,9 +118,7 @@ export function mediaSlot(config, kind) {
   };
 }
 
-export function isImageGenConfigured(config) {
-  try { validateMediaConfig(config); return true; } catch { return false; }
-}
+export function isImageGenConfigured() { return false; }
 
 export function imageGenAvailability({ configured = false, tier = 'full', mode = 'ask', readOnlyProfile = false } = {}) {
   if (!configured) return 'not_configured';

@@ -1,3 +1,5 @@
+> **Self-hosted privacy fork:** configure your own OpenAI-compatible endpoint. Built-in cloud providers and extra upload services are removed. See [self-hosted setup and builds](docs/SELF_HOSTED.md). Download the extension packages from [Releases](https://github.com/catcursor/webbrain/releases).
+
 <p align="center">
   <img src="assets/logo-mark.png" alt="WebBrain logo" width="92">
 </p>

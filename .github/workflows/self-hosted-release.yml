@@ -1,0 +1,75 @@
+name: Self-hosted extension release
+
+on:
+  push:
+    branches: [main, privacy/self-hosted]
+    paths:
+      - 'src/**'
+      - 'test/self-hosted-*.mjs'
+      - 'test/provider-message-privacy.mjs'
+      - 'scripts/build-private-release.py'
+      - 'package*.json'
+      - '.github/workflows/self-hosted-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: self-hosted-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'catcursor/webbrain'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            src
+            scripts
+            test
+            docs
+            LICENSES
+          sparse-checkout-cone-mode: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install test dependencies
+        run: npm ci
+      - name: Privacy and browser-safety regressions
+        run: npm run test:privacy
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test the unpacked extension against an owned mock API
+        run: npm run test:privacy:browser
+      - name: Build Chrome and Firefox packages
+        run: npm run build:privacy
+      - name: Publish packages to Releases
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="selfhosted-v${version}-${GITHUB_RUN_NUMBER}"
+          cat > /tmp/release-notes.md <<'NOTES'
+          Self-hosted build with a configurable OpenAI-compatible API and no built-in cloud providers.
+
+          Removed research uploads, cloud sync, remote favicons, FreeSkillz defaults, hosted decision routes, bulletin traffic and feedback uploads. Automatic memory is opt-in and bound to its original provider. Speech requires an explicit endpoint and refuses video containers.
+
+          Chrome: unzip the Chrome package and use **Load unpacked** under chrome://extensions.
+          Firefox: the XPI is **unsigned**. Firefox Developer Edition/Nightly or an AMO-signed build is required for normal installation; temporary loading is available under about:debugging.
+
+          SHA256SUMS verifies the downloads; SOURCE_REVISION.txt identifies the source commit.
+          NOTES
+          if gh release view "$tag" --repo "$REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/self-hosted/* --repo "$REPOSITORY" --clobber
+          else
+            gh release create "$tag" dist/self-hosted/* --repo "$REPOSITORY" \
+              --target "$GITHUB_SHA" --title "WebBrain self-hosted ${version}" \
+              --notes-file /tmp/release-notes.md --latest
+          fi

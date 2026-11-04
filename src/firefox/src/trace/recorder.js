@@ -109,7 +109,7 @@ async function isForcedTraceRun(runId) {
   if (!runId) return false;
   if (_runState.get(runId)?.feedbackOnly === true) {
     const settings = await traceStorage().get('feedbackDiagnosticsEnabled');
-    return settings.feedbackDiagnosticsEnabled !== false;
+    return settings.feedbackDiagnosticsEnabled === true;
   }
   if (_runState.get(runId)?.forced === true) return true;
   try {
@@ -119,7 +119,7 @@ async function isForcedTraceRun(runId) {
     );
     if (record?.feedbackOnly === true) {
       const settings = await traceStorage().get('feedbackDiagnosticsEnabled');
-      return settings.feedbackDiagnosticsEnabled !== false;
+      return settings.feedbackDiagnosticsEnabled === true;
     }
     return record?.forced === true;
   } catch { return false; }

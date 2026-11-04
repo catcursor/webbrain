@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "WebBrain",
-  "version": "46.0.0",
+  "version": "46.0.1",
   "description": "Open-source AI browser agent — chat with pages, automate tasks, multi-provider LLM support.",
   "permissions": [
     "activeTab",
@@ -25,9 +25,6 @@
     "search",
     "<all_urls>"
   ],
-  "chrome_url_overrides": {
-    "newtab": "newtab/index.html"
-  },
   "content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'; connect-src * data: blob: http://* ws://*;",
   "background": {
     "page": "src/background.html",
@@ -43,16 +40,24 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/page-monitor.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/page-monitor.js"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/page-monitor-shadow.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/page-monitor-shadow.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true,
@@ -60,16 +65,25 @@
       "match_origin_as_fallback": true
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/page-monitor-recovery.js", "src/content/page-monitor.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/page-monitor-recovery.js",
+        "src/content/page-monitor.js"
+      ],
       "run_at": "document_end",
       "all_frames": true,
       "match_about_blank": true,
       "match_origin_as_fallback": true
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/page-monitor-shadow.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/page-monitor-shadow.js"
+      ],
       "run_at": "document_end",
       "world": "MAIN",
       "all_frames": true,
@@ -77,12 +91,18 @@
       "match_origin_as_fallback": true
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/file-picker-guard-loader.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/file-picker-guard-loader.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "<all_urls>"
+      ],
       "js": [
         "src/content/file-upload-policy.js",
         "src/content/rich-text-toolbar-heuristic.js",
@@ -96,13 +116,21 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/selection-shortcut.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/selection-shortcut.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/redaction-regions.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/redaction-regions.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true,
       "match_about_blank": true
@@ -118,7 +146,9 @@
         "*://*.youtube.com/*",
         "*://youtu.be/*"
       ],
-      "js": ["src/agent/smd-loader.js"],
+      "js": [
+        "src/agent/smd-loader.js"
+      ],
       "run_at": "document_start"
     },
     {
@@ -171,8 +201,16 @@
       "id": "webbrain@esokullu.com",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
-        "required": ["none"],
-        "optional": ["personallyIdentifyingInfo", "authenticationInfo", "personalCommunications", "websiteContent", "technicalAndInteraction"]
+        "required": [
+          "none"
+        ],
+        "optional": [
+          "personallyIdentifyingInfo",
+          "authenticationInfo",
+          "personalCommunications",
+          "websiteContent",
+          "technicalAndInteraction"
+        ]
       }
     }
   },

@@ -1,3 +1,4 @@
+import './self-hosted-ui.js';
 import { DECISION_MODE_KEY, DECISION_SETTINGS_KEYS, materializeLegacyDecisionFeatures, DEFAULT_DECISION_MODEL, WEBGPU_CHAT_DECISION_MODEL, resolveDecisionConfig, resolveDecisionMode } from '../agent/decision-config.js';
 import { normalizeLeanModeSetting } from '../agent/lean-mode.js';
 import { normalizeVisionModeSetting } from '../agent/vision-mode.js';
@@ -698,7 +699,7 @@ async function init() {
   if (selectionShortcutToggle) selectionShortcutToggle.checked = stored.selectionShortcutEnabled !== false;
   if (pdfViewerToggle) pdfViewerToggle.checked = stored.pdfViewerEnabled === undefined || stored.pdfViewerEnabled === true;
   if (autoGroupTabsToggle) autoGroupTabsToggle.checked = stored[AUTO_GROUP_TABS_KEY] !== false;
-  if (helpImproveToggle) helpImproveToggle.checked = stored.helpImproveWebBrain !== false; // on by default
+  if (helpImproveToggle) helpImproveToggle.checked = false; // on by default
   if (newTabToggle) newTabToggle.checked = stored.newTabEnabled === true; // opt-in: off until chosen
   if (screenshotToggle) screenshotToggle.checked = stored.screenshotFallback ?? true; // on by default
   if (maxStepsRange && stepsValueLabel) {
@@ -803,7 +804,7 @@ async function init() {
   }
   // The On fields show the configuration On uses: a profile in On as it is
   // stored, any other with On's defaults.
-  if (decisionProviderInput) {
+  if (false && decisionProviderInput) {
     const storedDecisionMode = resolveDecisionMode(stored);
     setDecisionMode(storedDecisionMode);
     const decisionConfig = resolveDecisionConfig(storedDecisionMode === 'on' ? stored : { ...stored, [DECISION_MODE_KEY]: 'on' });
@@ -2871,12 +2872,7 @@ const OPTIONAL_LOCAL_API_KEY_FIELD = {
   placeholder: 'optional',
   collapsed: true,
 };
-const SHARE_RESEARCH_FIELD = {
-  key: 'shareQueriesForResearch',
-  labelKey: 'st.providers.share_research.label',
-  hintKey: 'st.providers.share_research.hint',
-  type: 'checkbox',
-};
+
 
 export {
   COMPANION_PREFERRED_MODEL_PATTERNS,
@@ -3608,7 +3604,7 @@ async function handleWebgpuDownloadButton(btn) {
         try {
           const fallback = providersData?.webbrain_cloud
             ? 'webbrain_cloud'
-            : Object.keys(providersData || {}).find((candidate) => candidate !== id && providerIsActive(candidate, providersData[candidate])) || 'webbrain_cloud';
+            : Object.keys(providersData || {}).find((candidate) => candidate !== id && providerIsActive(candidate, providersData[candidate])) || 'custom_openai';
           await sendToBackground('set_active_provider', { providerId: fallback });
           activeProviderId = fallback;
           requestedActiveProviderId = fallback;
@@ -3716,424 +3712,14 @@ function renderProviders() {
   // re-renders with translated labels. Placeholders stay as raw values —
   // they're example URLs or API key shapes and reading them in English is
   // universal enough.
-  const providerConfigs = {
-    webbrain_cloud: {
-      fields: [],
-    },
-    llamacpp: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:8080' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'unsloth/Qwen3.8-27B-GGUF' },
-        CONTEXT_WINDOW_FIELD,
-        VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    ollama: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:11434/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'qwen3.8:27b' },
-        CONTEXT_WINDOW_FIELD,
-        OLLAMA_VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    ods: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:11434/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'select the running ODS model' },
-        CONTEXT_WINDOW_FIELD,
-        VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    lmstudio: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:1234/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model_optional', type: 'text', placeholderKey: 'st.provider.field.model_loaded_hint' },
-        CONTEXT_WINDOW_FIELD,
-        VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    osaurus: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://127.0.0.1:1337/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'llama-3.2-3b-instruct' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    jan: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:1337/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'google/gemma-4-12B-it' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    vllm: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:8000/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'Qwen/Qwen3.8-27B' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    sglang: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:30000/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'Qwen/Qwen3.8-27B' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    localai: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:8080/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'gpt-4' },
-        CONTEXT_WINDOW_FIELD,
-        VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    gpt4all: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://localhost:4891/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'loaded model' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    webbrain_companion: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://127.0.0.1:8327/v1' },
-        OPTIONAL_LOCAL_API_KEY_FIELD,
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'model listed in WebBrain Companion' },
-        LOCAL_PROXY_CONTEXT_WINDOW_FIELD,
-        VISION_MODE_FIELD,
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    local_openai_proxy: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://127.0.0.1:8317/v1' },
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'required — use the proxy client API key' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'model exposed by the proxy' },
-        LOCAL_PROXY_CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    unsloth: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.server_url', type: 'text', placeholder: 'http://127.0.0.1:8888/v1' },
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-unsloth-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'model loaded in Unsloth Studio' },
-        CONTEXT_WINDOW_FIELD,
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    webgpu: {
-      fields: [
-        {
-          key: 'model',
-          labelKey: 'st.provider.field.model',
-          type: 'text',
-          placeholder: 'owner/repository',
-          suggestions: WEBGPU_SELECTABLE_MODEL_PRESETS.map(option => option.id),
-          suggestionLabels: Object.fromEntries(WEBGPU_SELECTABLE_MODEL_PRESETS.map(option => [
-            option.id,
-            `${option.label} — ${option.id}${option.supportsVision ? ` — ${t('st.provider.field.supports_vision')}` : ''}`,
-          ])),
-        },
-        WEBGPU_CONTEXT_WINDOW_FIELD,
-        // Vision support is fixed by the selected WebGPU model's graph files.
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox', disabled: true },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    azure_openai: {
-      fields: [
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://{resource}.openai.azure.com' },
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'Azure API key' },
-        { key: 'model', labelKey: 'st.provider.field.deployment_name', type: 'text', placeholder: 'my-deployment' },
-        { key: 'apiVersion', labelKey: 'st.provider.field.api_version', type: 'text', placeholder: '2024-10-21' },
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    aws_bedrock: {
-      fields: [
-        { key: 'region', labelKey: 'st.provider.field.aws_region', type: 'text', placeholder: 'us-east-1' },
-        { key: 'accessKeyId', labelKey: 'st.provider.field.aws_access_key_id', type: 'text', placeholder: 'AKIA...' },
-        { key: 'secretAccessKey', labelKey: 'st.provider.field.aws_secret_access_key', type: 'password', placeholder: '********' },
-        { key: 'sessionToken', labelKey: 'st.provider.field.aws_session_token', type: 'password', placeholder: 'optional (STS)' },
-        { key: 'model', labelKey: 'st.provider.field.bedrock_model_id', type: 'text', placeholder: 'anthropic.claude-sonnet-5' },
-        ...CACHE_AWARE_COST_ESTIMATE_FIELDS,
-      ],
-    },
-    openai: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'gpt-5.6-terra',
-          suggestions: [
-            'gpt-6-luna-pro',
-            'gpt-6.1-sol',
-            'gpt-6-astra',
-            'gpt-5.6-terra',
-            'gpt-5.6-sol',
-            'gpt-5.6-luna',
-            'gpt-5.6',
-            'gpt-5.5-2026-04-23',
-            'gpt-5.5-pro-2026-04-23',
-            'gpt-5.4-2026-03-05',
-            'gpt-5.4-pro-2026-03-05',
-            'gpt-5.4-mini-2026-03-17',
-            'gpt-5.4-nano-2026-03-17',
-          ] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.openai.com/v1' },
-        ...OPENAI_COST_ESTIMATE_FIELDS,
-      ],
-    },
-    openrouter: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-or-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'openrouter/free',
-          suggestions: ['openrouter/free', 'deepseek/deepseek-v4.1-flash-1017', 'google/gemini-4-argon', 'meta/muse-wonder', 'meta/muse-spark-open', 'anthropic/claude-opus-5.5', 'qwen/qwen3.8-27b', 'moonshotai/kimi-k3', 'z-ai/glm-5.3', 'minimax/minimax-m3'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://openrouter.ai/api/v1' },
-        PROMPT_TIER_FIELD,
-        TOOL_MODE_FIELD,
-        OPENROUTER_VISION_MODE_FIELD,
-      ],
-    },
-    huggingface: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'hf_...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'moonshotai/Kimi-K3',
-          suggestions: ['moonshotai/Kimi-K3', 'zai-org/GLM-5.2', 'Qwen/Qwen3.8-2.4T-A95B', 'Qwen/Qwen3.6-27B'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://router.huggingface.co/v1' },
-        // Hugging Face's catalog is huge and open-ended — unlike curated
-        // routers, model-name sniffing (openai.js supportsVision) can't
-        // reliably tell VLMs from text-only models, so expose an explicit
-        // toggle like the local providers do.
-        { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    fireworks: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'fw_...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'accounts/fireworks/models/kimi-k3',
-          suggestions: [
-            'accounts/fireworks/models/kimi-k3',
-            'accounts/fireworks/models/glm-5p2',
-            'accounts/fireworks/models/minimax-m3',
-            'accounts/fireworks/models/deepseek-v4-pro-0813',
-            'accounts/fireworks/models/qwen3p8-2p4t-a95b',
-          ] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.fireworks.ai/inference/v1' },
-        PROMPT_TIER_FIELD,
-      ],
-    },
-    anthropic: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-ant-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'claude-opus-5',
-          suggestions: ['claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-5-5', 'claude-haiku-4-5'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.anthropic.com' },
-        ...CACHE_AWARE_COST_ESTIMATE_FIELDS,
-      ],
-    },
-    gemini: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'AIza...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'gemini-3.1-pro',
-          suggestions: ['gemini-4-argon', 'gemini-3.1-pro', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://generativelanguage.googleapis.com/v1beta/openai' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    cloudflare: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'API token' },
-        { key: 'accountId', label: 'Cloudflare Account ID', type: 'text', placeholder: '0123456789abcdef0123456789abcdef' },
-        { key: 'gatewayId', label: 'AI Gateway ID (optional; @cf defaults to default)', type: 'text', placeholder: 'my-gateway' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: '@cf/zai-org/glm-5.2',
-          suggestions: ['@cf/zai-org/glm-5.2', '@cf/qwen/qwen3-30b-a3b-fp8'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    mistral: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'API key' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'mistral-medium-3.5',
-          suggestions: ['mistral-medium-3.5', 'mistral-large-latest', 'mistral-small-4', 'codestral-latest'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.mistral.ai/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    deepseek: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'deepseek-flash',
-          suggestions: ['deepseek-flash', 'deepseek-v4-flash'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.deepseek.com' },
-        // Chat Completions is the default wire format; DeepSeek's Responses API
-        // is an opt-in that mainly adds JSON-schema structured output.
-        { key: 'apiFormat', labelKey: 'st.provider.field.api_format', type: 'select', collapsed: true,
-          options: [
-            { value: 'auto', label: 'Chat Completions (default)' },
-            { value: 'chat', label: 'Chat Completions' },
-            { value: 'responses', label: 'Responses API' },
-          ] },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    xai: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'xai-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'grok-4.6',
-          suggestions: ['grok-4.6', 'grok-4.5', 'grok-4.3', 'grok-build-0.1'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.x.ai/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    nvidia: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'nvapi-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'nvidia/nemotron-3-super-120b-a12b',
-          suggestions: ['nvidia/nemotron-3-super-120b-a12b', 'nvidia/nemotron-3-nano-30b-a3b', 'z-ai/glm-5.2', 'qwen/qwen3.5-397b-a17b', 'nvidia/llama-3.3-nemotron-super-49b-v1.5'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://integrate.api.nvidia.com/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    minimax: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'API key' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'MiniMax-M3',
-          suggestions: ['MiniMax-M3', 'MiniMax-M2.7'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.minimax.chat/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    kimi: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'kimi-k3',
-          suggestions: ['kimi-k3', 'kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.moonshot.ai/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    alibaba: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'sk-...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'qwen3.8-max',
-          suggestions: ['qwen3.8-max', 'qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    together: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'tgp_...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'moonshotai/Kimi-K3',
-          suggestions: [
-            'moonshotai/Kimi-K3',
-            'zai-org/GLM-5.2',
-            'MiniMaxAI/MiniMax-M3',
-            'Qwen/Qwen3.8-2.4T-A95B',
-            'google/gemma-4-31B-it',
-          ] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.together.xyz/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    groq: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'gsk_...' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'openai/gpt-oss-120b',
-          suggestions: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.groq.com/openai/v1' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-    z_ai: {
-      fields: [
-        { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'API key' },
-        { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'glm-5.3',
-          suggestions: ['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-5-turbo'] },
-        { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'https://api.z.ai/api/paas/v4' },
-        ...COST_ESTIMATE_FIELDS,
-      ],
-    },
-  };
-
-  // Filter bar — sits above the list. Pill row, click-to-switch.
-  // "All" includes everything; the per-category pills hide cards whose
-  // `category` doesn't match. The selected provider is ALWAYS visible
-  // regardless of filter (so the user never loses track of it).
-  // Additional providers share a predictable OpenAI-compatible settings
-  // shape. Provider-specific suggestions/placeholders stay in the catalog;
-  // UI-only metadata is never persisted with credentials.
-  for (const [id, meta] of Object.entries(ADDITIONAL_PROVIDER_UI)) {
-    const config = providersData[id] || {};
-    const fields = [
-      {
-        key: 'apiKey',
-        labelKey: 'st.provider.field.api_key',
-        type: 'password',
-        placeholder: meta.apiKeyPlaceholder || 'API key',
-      },
-    ];
-    if (id === 'azure-cognitive-services') {
-      fields.push({ key: 'resource', label: 'Azure resource name', type: 'text', placeholder: 'my-resource' });
-    }
-    if (id === 'google-vertex' || id === 'google-vertex-anthropic') {
-      fields.push(
-        { key: 'project', label: 'Google Cloud project ID', type: 'text', placeholder: 'my-project' },
-        { key: 'location', label: 'Google Cloud location', type: 'text', placeholder: id === 'google-vertex' ? 'us-central1' : 'us-east5' },
-      );
-    }
-    fields.push(
-      {
-        key: 'model',
-        labelKey: 'st.provider.field.model',
-        type: 'text',
-        placeholder: config.model || (id === 'azure-cognitive-services' ? 'deployed-model-name' : 'model-id'),
-        suggestions: meta.suggestions || [],
-      },
-      {
-        key: 'baseUrl',
-        labelKey: 'st.provider.field.api_base_url',
-        type: 'text',
-        placeholder: config.baseUrl || 'https://provider.example/v1',
-      },
-      CONTEXT_WINDOW_FIELD,
-      { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
-    );
-    if (config.category === 'router' || config.category === 'local') fields.push(PROMPT_TIER_FIELD);
-    fields.push(...COST_ESTIMATE_FIELDS);
-    providerConfigs[id] = { fields };
-  }
+  const providerConfigs = { custom_openai: { fields: [
+    { key: 'baseUrl', labelKey: 'st.provider.field.api_base_url', type: 'text', placeholder: 'http://127.0.0.1:8000/v1' },
+    { key: 'apiKey', labelKey: 'st.provider.field.api_key', type: 'password', placeholder: 'optional' },
+    { key: 'model', labelKey: 'st.provider.field.model', type: 'text', placeholder: 'your-model-id' },
+    CONTEXT_WINDOW_FIELD, MAX_OUTPUT_TOKENS_FIELD,
+    { key: 'supportsVision', labelKey: 'st.provider.field.supports_vision', type: 'checkbox' },
+    PROMPT_TIER_FIELD,
+  ] } };
 
   // Model limits are portable provider settings, not local-runtime-only
   // details. Keep them optional and expose them on every configurable card.
@@ -4144,7 +3730,7 @@ function renderProviders() {
     if (!keys.has('maxOutputTokens')) definition.fields.push(MAX_OUTPUT_TOKENS_FIELD);
     // Voluntary research sharing is opt-in per provider and never shown for
     // WebBrain Compass itself.
-    if (!keys.has('shareQueriesForResearch')) definition.fields.push(SHARE_RESEARCH_FIELD);
+
   }
 
   providersContainer.appendChild(renderProviderFilterBar());
@@ -4239,7 +3825,7 @@ function renderProviders() {
           </div>
         `;
       } else {
-        const localModelProviders = ['llamacpp', 'ollama', 'ods', 'lmstudio', 'osaurus', 'jan', 'vllm', 'sglang', 'localai', 'gpt4all', 'webbrain_companion', 'local_openai_proxy', 'unsloth'];
+        const localModelProviders = ['custom_openai', 'llamacpp', 'ollama', 'ods', 'lmstudio', 'osaurus', 'jan', 'vllm', 'sglang', 'localai', 'gpt4all', 'webbrain_companion', 'local_openai_proxy', 'unsloth'];
         const canLoadModels = localModelProviders.includes(definitionId) && field.key === 'model';
         const listAttr = canLoadModels ? `list="models-${id}"` : '';
         const datalistHTML = canLoadModels ? `<datalist id="models-${id}"></datalist>` : '';

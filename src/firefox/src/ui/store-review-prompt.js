@@ -53,21 +53,7 @@ export function recordSuccessfulTask(state, { now = Date.now() } = {}) {
   return next;
 }
 
-export function shouldShowPrompt(state, {
-  now = Date.now(),
-  onboardingComplete = true,
-} = {}) {
-  const s = normalizeState(state);
-  if (!onboardingComplete) return false;
-  if (s.neverAsk) return false;
-  if (s.reviewOpened || s.feedbackSubmitted) return false;
-  if (s.successfulTasks < MIN_SUCCESSFUL_TASKS) return false;
-  if (!s.firstSuccessAt) return false;
-  if (now - s.firstSuccessAt < MIN_DAYS_BEFORE_PROMPT * MS_PER_DAY) return false;
-  if (s.dismissedAt && now - s.dismissedAt < DISMISS_COOLDOWN_DAYS * MS_PER_DAY) return false;
-  if (s.lastShownAt && !s.reviewOpened && !s.feedbackSubmitted && now - s.lastShownAt < DISMISS_COOLDOWN_DAYS * MS_PER_DAY) return false;
-  return true;
-}
+export function shouldShowPrompt() { return false; }
 
 export function markPromptShown(state, { now = Date.now() } = {}) {
   const next = normalizeState(state);

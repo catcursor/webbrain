@@ -18,7 +18,7 @@ for (const build of ['chrome', 'firefox']) {
     const stored = serializeConversationForSession(messages, { preserveMessageIndices: [1] }).messages;
     assert.equal(stored[1].webbrainResumeTaskId, taskId);
     const restored = JSON.parse(JSON.stringify(stored));
-    const provider = new OpenAICompatibleProvider({ model: 'gpt-4o' });
+    const provider = new OpenAICompatibleProvider({ baseUrl: 'http://127.0.0.1:8000/v1', model: 'private-model' });
     for (const stream of [false, true]) {
       const body = provider._buildChatCompletionsBody(restored, {}, stream);
       assert.deepEqual(body.messages, messages.map(({ role, content }) => ({ role, content })));
@@ -66,7 +66,7 @@ for (const build of ['chrome', 'firefox']) {
     assert.equal(applied.webbrainSteering.priorSubmission.privateDispatchToken, 'OWNED_PRIVATE_DISPATCH_RECEIPT');
     const stored = serializeConversationForSession(messages, { preserveMessageIndices: [2] }).messages;
     assert.equal(stored[2].webbrainSteering.messageId, 'owned-correction');
-    const provider = new OpenAICompatibleProvider({ model: 'gpt-4o' });
+    const provider = new OpenAICompatibleProvider({ baseUrl: 'http://127.0.0.1:8000/v1', model: 'private-model' });
     const body = provider._buildChatCompletionsBody(agent._modelVisibleConversationMessages(stored), {}, false);
     assert.ok(body.messages.at(-1).content.startsWith(applied.content));
     assert.ok(body.messages.at(-1).content.endsWith(agent._plannerAuthenticTaskText(stored)));

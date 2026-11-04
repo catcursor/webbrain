@@ -1,3 +1,4 @@
+import { SELF_HOSTED_PROVIDER_ID, SELF_HOSTED_DEFAULT, ownProvider, selfHostedProviders } from './self-hosted.js';
 import { LlamaCppProvider } from './llamacpp.js';
 import { OpenAICompatibleProvider } from './openai.js';
 import { DeepSeekProvider } from './deepseek.js';
@@ -61,7 +62,7 @@ const WEBBRAIN_CLOUD_PROVIDER_IDS = new Set([
 ]);
 const WEBBRAIN_CLOUD_PROVIDER_LABEL = 'WebBrain Compass';
 const DUPLICATE_PROVIDER_SUFFIX = '__duplicate';
-const LOCAL_MODEL_LIST_PROVIDER_IDS = ['llamacpp', 'ollama', 'ods', 'lmstudio', 'osaurus', 'jan', 'vllm', 'sglang', 'localai', 'gpt4all', 'webbrain_companion', 'local_openai_proxy', 'unsloth', 'freebuff2api'];
+const LOCAL_MODEL_LIST_PROVIDER_IDS = ['custom_openai', 'llamacpp', 'ollama', 'ods', 'lmstudio', 'osaurus', 'jan', 'vllm', 'sglang', 'localai', 'gpt4all', 'webbrain_companion', 'local_openai_proxy', 'unsloth', 'freebuff2api'];
 const WEBBRAIN_CLOUD_CONTEXT_WINDOW = 1000000;
 const WEBBRAIN_CLOUD_LEGACY_CONTEXT_WINDOW = 256000;
 const WEBBRAIN_DEVICE_GUID_KEY = 'webbrainDeviceGuid';
@@ -296,117 +297,26 @@ export class ProviderManager {
    * defaults do not stay visible forever for existing users.
    */
   async load() {
-    const data = await browser.storage.local.get(['providers', 'activeProvider', WEBBRAIN_DEVICE_GUID_KEY, HELP_IMPROVE_WEBBRAIN_KEY]);
-    const rawStoredOllama = data.providers?.ollama;
-    const ollamaVisionConfigMigrated = !!rawStoredOllama && (
-      !OLLAMA_VISION_MODES.has(rawStoredOllama.visionMode)
-      || Object.hasOwn(rawStoredOllama, 'supportsVision')
-    );
-    const genericVisionConfigMigrated = Object.entries(data.providers || {}).some(([id, config]) => {
-      return !!visionProviderKind(config?.duplicateOf || id, config) && (
-        !VISION_MODES.has(config.visionMode)
-        || Object.hasOwn(config, 'supportsVision')
-        || (!String(config.model || '').trim() && config.visionDetection != null)
-      );
-    });
-    const companionVisionConfigMigrated = Object.entries(data.providers || {}).some(([id, config]) => {
-      const defId = config?.duplicateOf || id;
-      return defId === 'webbrain_companion' && (
-        !VISION_MODES.has(config.visionMode)
-        || Object.hasOwn(config, 'supportsVision')
-      );
-    });
-    const hadLegacyClaudeSubscription = Object.hasOwn(data.providers || {}, 'claude_subscription');
-    const rawStoredProviders = data.providers || {};
-    const stored = this._migrateStoredProviderConfigs(rawStoredProviders);
-    const legacyActiveProviderId = ['webbrain', 'openai_subscription'].includes(data.activeProvider)
-      ? WEBBRAIN_CLOUD_PROVIDER_ID
-      : data.activeProvider;
-    const defaults = this._defaultConfigs();
-    const configs = {};
-    let providerStateMigrated = ollamaVisionConfigMigrated
-      || genericVisionConfigMigrated
-      || this._storedProviderConfigsChanged(rawStoredProviders, stored);
-    for (const [id, config] of Object.entries(defaults)) {
-      const storedConfig = stored[id];
-      const hasConfiguredMarker = !!storedConfig && Object.hasOwn(storedConfig, 'configured');
-      const configured = !WEBBRAIN_CLOUD_PROVIDER_IDS.has(id) && (
-        storedConfig?.configured === true ||
-        (!hasConfiguredMarker && !!storedConfig && (
-          id === legacyActiveProviderId ||
-          this._hasStoredProviderCredentials(config, storedConfig)
-        ))
-      );
-      configs[id] = {
-        ...config,
-        ...this._storedDefaultOverride(config, storedConfig),
-        configured,
-      };
-      // Voluntary research sharing is opt-in per provider and default-off
-      // (never on for WebBrain Compass itself, which already shares via its
-      // own outbox). Applied in the field-level merge so existing stored
-      // configs without the key inherit the off state without polluting the
-      // default catalog snapshots.
-      if (id !== WEBBRAIN_CLOUD_PROVIDER_ID && !Object.hasOwn(configs[id], 'shareQueriesForResearch')) {
-        configs[id].shareQueriesForResearch = false;
-      }
-      if (Object.hasOwn(configs[id], 'duplicateOf')) {
-        delete configs[id].duplicateOf;
-        providerStateMigrated = true;
-      }
-      if (storedConfig && !hasConfiguredMarker) providerStateMigrated = true;
-    }
-    for (const [id, config] of Object.entries(stored)) {
-      if (!configs[id] && this._isSupportedProviderConfig(id, config)) {
-        const hasConfiguredMarker = Object.hasOwn(config, 'configured');
-        configs[id] = {
-          ...config,
-          configured: !WEBBRAIN_CLOUD_PROVIDER_IDS.has(id) && (config.configured === true || !hasConfiguredMarker),
-        };
-        if (!hasConfiguredMarker) providerStateMigrated = true;
-      }
-    }
-    for (const [id, config] of Object.entries(configs)) {
-      if ((config?.duplicateOf || id) === 'webbrain_companion') {
-        if (!VISION_MODES.has(config.visionMode)) {
-          config.visionMode = typeof config.supportsVision === 'boolean'
-            ? (config.supportsVision ? 'on' : 'off')
-            : 'auto';
-        }
-        delete config.supportsVision;
-      }
-      if (config.duplicateOf && !this._isValidDuplicateConfig(id, config, configs)) {
-        delete configs[id];
-        providerStateMigrated = true;
-      }
-    }
-    delete configs.webbrain;
-    delete configs.openai_subscription;
-    delete configs.claude_subscription;
-    // The claude_subscription provider entry above is gone and its
-    // settings-UI sign-out control with it, so purge any leftover OAuth
-    // token bundle here — otherwise a previously-signed-in user's raw
-    // access/refresh tokens would sit in storage with no UI path to clear them.
-    if (hadLegacyClaudeSubscription) await signOutClaude();
-    if (companionVisionConfigMigrated) providerStateMigrated = true;
-    const deviceGuid = await this._getDeviceGuid(data[WEBBRAIN_DEVICE_GUID_KEY]);
-    for (const id of WEBBRAIN_CLOUD_PROVIDER_IDS) {
-      if (!configs[id]) continue;
-      configs[id].deviceGuid = deviceGuid;
-      configs[id].helpImproveWebBrain = data[HELP_IMPROVE_WEBBRAIN_KEY] !== false;
-    }
-    this.activeProviderId = legacyActiveProviderId || WEBBRAIN_CLOUD_PROVIDER_ID;
-    if (!configs[this.activeProviderId]) this.activeProviderId = WEBBRAIN_CLOUD_PROVIDER_ID;
-    if (!WEBBRAIN_CLOUD_PROVIDER_IDS.has(this.activeProviderId) && configs[this.activeProviderId]?.configured !== true) {
-      this.activeProviderId = WEBBRAIN_CLOUD_PROVIDER_ID;
-      providerStateMigrated = true;
-    }
-
+    const data = await chrome.storage.local.get(['providers', 'activeProvider', 'selfHostedPrivacyV1']);
+    const state = selfHostedProviders(data.providers, data.activeProvider);
     this.providers.clear();
-    for (const [id, config] of Object.entries(configs)) {
-      this.providers.set(id, this._createProvider(id, config));
+    for (const [id, config] of Object.entries(state.providers)) this.providers.set(id, this._createProvider(id, config));
+    this.activeProviderId = state.activeProvider;
+    if (data.selfHostedPrivacyV1 !== true) {
+      await chrome.storage.local.set({ selfHostedPrivacyV1: true,
+        helpImproveWebBrain: false, profileSyncEnabled: false,
+        userMemoryAutoCaptureEnabled: false, userMemoryFormCaptureEnabled: false,
+        tracingEnabled: false, feedbackDiagnosticsEnabled: false,
+        researchEscalationEnabled: false, decisionMode: 'off', systemOneEnabled: false,
+        screenshotRedaction: true, webgpuVisionEnabled: false,
+        wb_memcode_recall_enabled: false, newTabEnabled: false,
+        visionModel: null, transcriptionModel: null, imageGenModel: null,
+      });
+      await chrome.storage.local.remove(['webbrainShareOutboxV1', 'cloudRuntimeOutboxV1',
+        'webbrainCloudRuntimeOutboxV1', 'webbrainDeviceGuid', 'profileSyncToken',
+        'wb_user_memory_extraction_queue_v1', 'wb_memcode_oauth_v1']);
     }
-    if (providerStateMigrated) await this.save();
+    if (JSON.stringify(data.providers) !== JSON.stringify(state.providers) || data.activeProvider !== state.activeProvider) await this.save();
   }
 
   /**
@@ -424,517 +334,7 @@ export class ProviderManager {
   }
 
   _defaultConfigs() {
-    const defaults = {
-      webbrain_cloud: {
-        type: 'openai',
-        category: 'cloud',
-        label: WEBBRAIN_CLOUD_PROVIDER_LABEL,
-        providerName: 'webbrain-cloud',
-        baseUrl: 'https://api.webbrain.one/v1',
-        model: 'webbrain-cloud 1.0',
-        contextWindow: WEBBRAIN_CLOUD_CONTEXT_WINDOW,
-        inputCostPerMillionUsd: 0.20,
-        outputCostPerMillionUsd: 1.15,
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        supportsVision: true,
-        // WebBrain Compass proxies to OpenRouter, whose upstream models
-        // (minimax, stepfun, …) handle tools + images together fine. Dropping
-        // tools on image turns forced the model into prompt-based tool calling,
-        // which leaks raw tool-call template tokens (e.g. `]<]minimax[>[`) into
-        // content and never produces a tool_calls array. Keep tools on.
-        omitToolsWhenImagesPresent: false,
-        apiKey: '',
-        enabled: true,
-      },
-      webbrain_cloud_max: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'WebBrain Compass XL',
-        providerName: 'webbrain-cloud',
-        baseUrl: 'https://api.webbrain.one/v1',
-        model: 'max',
-        contextWindow: WEBBRAIN_CLOUD_CONTEXT_WINDOW,
-        inputCostPerMillionUsd: 1.00,
-        outputCostPerMillionUsd: 5.75,
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        supportsVision: true,
-        omitToolsWhenImagesPresent: false,
-        apiKey: '',
-        enabled: true,
-        sidepanelOnly: true,
-      },
-      llamacpp: {
-        type: 'llamacpp',
-        category: 'local',
-        label: 'llama.cpp (Local)',
-        baseUrl: 'http://localhost:8080',
-        model: '',
-        contextWindow: 16384,
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        visionDetection: null,
-        enabled: true,
-      },
-      ollama: {
-        type: 'openai',
-        category: 'local',
-        label: 'Ollama (Local)',
-        providerName: 'ollama',
-        requiresModel: true,
-        baseUrl: 'http://localhost:11434/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: 'ollama',
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        visionDetection: null,
-        enabled: true,
-      },
-      ods: {
-        type: 'openai',
-        category: 'local',
-        label: 'ODS (Local)',
-        providerName: 'ods',
-        requiresModel: true,
-        baseUrl: 'http://localhost:11434/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        visionDetection: null,
-        enabled: true,
-      },
-      lmstudio: {
-        type: 'openai',
-        category: 'local',
-        label: 'LM Studio (Local)',
-        providerName: 'lmstudio',
-        baseUrl: 'http://localhost:1234/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: 'lm-studio',
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        visionDetection: null,
-        enabled: true,
-      },
-      osaurus: {
-        type: 'openai',
-        category: 'local',
-        label: 'Osaurus (Local)',
-        providerName: 'osaurus',
-        requiresModel: true,
-        baseUrl: 'http://127.0.0.1:1337/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        supportsVision: false,
-        enabled: true,
-      },
-      jan: {
-        type: 'openai',
-        category: 'local',
-        label: 'Jan (Local)',
-        providerName: 'jan',
-        requiresModel: true,
-        baseUrl: 'http://localhost:1337/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        supportsVision: true,
-        enabled: true,
-      },
-      vllm: {
-        type: 'openai',
-        category: 'local',
-        label: 'vLLM (Local)',
-        providerName: 'vllm',
-        requiresModel: true,
-        baseUrl: 'http://localhost:8000/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        supportsVision: true,
-        enabled: true,
-      },
-      sglang: {
-        type: 'openai',
-        category: 'local',
-        label: 'SGLang (Local)',
-        providerName: 'sglang',
-        requiresModel: true,
-        baseUrl: 'http://localhost:30000/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        supportsVision: true,
-        enabled: true,
-      },
-      localai: {
-        type: 'openai',
-        category: 'local',
-        label: 'LocalAI (Local)',
-        providerName: 'localai',
-        requiresModel: true,
-        baseUrl: 'http://localhost:8080/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        visionDetection: null,
-        enabled: true,
-      },
-      gpt4all: {
-        type: 'openai',
-        category: 'local',
-        label: 'GPT4All (Local)',
-        providerName: 'gpt4all',
-        requiresModel: true,
-        baseUrl: 'http://localhost:4891/v1',
-        model: '',
-        contextWindow: 16384,
-        apiKey: '',
-        supportsAskStreaming: true,
-        supportsVision: true,
-        enabled: true,
-      },
-      webbrain_companion: {
-        type: 'openai',
-        category: 'local',
-        label: 'WebBrain Companion',
-        providerName: 'webbrain-companion',
-        baseUrl: 'http://127.0.0.1:8327/v1',
-        model: '',
-        requiresModel: true,
-        contextWindow: LOCAL_OPENAI_PROXY_CONTEXT_WINDOW,
-        apiKey: '',
-        supportsAskStreaming: true,
-        visionMode: 'auto',
-        enabled: true,
-      },
-      local_openai_proxy: {
-        type: 'openai',
-        category: 'local',
-        label: 'Local OpenAI-compatible Proxy',
-        providerName: 'local-openai-proxy',
-        baseUrl: 'http://127.0.0.1:8317/v1',
-        model: '',
-        requiresModel: true,
-        contextWindow: LOCAL_OPENAI_PROXY_CONTEXT_WINDOW,
-        apiKey: '',
-        requiresApiKey: true,
-        supportsAskStreaming: true,
-        supportsVision: false,
-        enabled: true,
-      },
-      unsloth: {
-        type: 'openai',
-        category: 'local',
-        label: 'Unsloth Studio (Local)',
-        providerName: 'unsloth',
-        baseUrl: 'http://127.0.0.1:8888/v1',
-        model: '',
-        requiresModel: true,
-        contextWindow: 16384,
-        apiKey: '',
-        requiresApiKey: true,
-        supportsAskStreaming: true,
-        supportsVision: false,
-        enabled: true,
-      },
-      azure_openai: {
-        type: 'azure_openai',
-        category: 'cloud',
-        label: 'Azure OpenAI',
-        providerName: 'azure-openai',
-        baseUrl: 'https://{resource}.openai.azure.com',
-        model: '',
-        apiVersion: '2024-10-21',
-        apiKey: '',
-        supportsAskStreaming: true,
-        enabled: false,
-      },
-      aws_bedrock: {
-        type: 'aws_bedrock',
-        category: 'cloud',
-        label: 'AWS Bedrock (Converse)',
-        providerName: 'aws-bedrock',
-        baseUrl: 'https://bedrock-runtime.{region}.amazonaws.com',
-        model: '',
-        region: 'us-east-1',
-        accessKeyId: '',
-        secretAccessKey: '',
-        sessionToken: '',
-        supportsVision: false,
-        // Seed Claude Sonnet 5 rates; users should adjust for other Bedrock models.
-        inputCostPerMillionUsd: 2,
-        cacheReadCostPerMillionUsd: 0.2,
-        cacheWriteCostPerMillionUsd: 2.5,
-        cacheWrite1hCostPerMillionUsd: 4,
-        outputCostPerMillionUsd: 10,
-        enabled: false,
-      },
-      openai: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'OpenAI',
-        providerName: 'openai',
-        baseUrl: 'https://api.openai.com/v1',
-        model: OPENAI_DEFAULT_MODEL,
-        // Keep the default at the standard-price input threshold; users can
-        // opt into the model's larger window when long-context pricing is acceptable.
-        contextWindow: 272000,
-        maxOutputTokens: 128000,
-        inputCostPerMillionUsd: 2.5,
-        cacheReadCostPerMillionUsd: 0.25,
-        // GPT-5.6 family bills included cache writes at 1.25× input.
-        cacheWriteCostPerMillionUsd: 3.125,
-        outputCostPerMillionUsd: 15,
-        supportsStreamUsageOptions: true,
-        apiKey: '',
-        apiKeyUrl: 'https://platform.openai.com/api-keys',
-        enabled: false,
-      },
-      anthropic: {
-        type: 'anthropic',
-        category: 'cloud',
-        label: 'Anthropic Claude',
-        baseUrl: 'https://api.anthropic.com',
-        model: 'claude-sonnet-5',
-        contextWindow: 1000000,
-        maxOutputTokens: 128000,
-        inputCostPerMillionUsd: 2,
-        cacheReadCostPerMillionUsd: 0.2,
-        cacheWriteCostPerMillionUsd: 2.5,
-        cacheWrite1hCostPerMillionUsd: 4,
-        outputCostPerMillionUsd: 10,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://console.anthropic.com/settings/keys',
-        enabled: false,
-      },
-      gemini: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'Google Gemini',
-        providerName: 'gemini',
-        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-        model: 'gemini-3.7-flash',
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        enabled: false,
-      },
-      cloudflare: {
-        type: 'openai',
-        category: 'router',
-        label: 'Cloudflare AI Gateway / Workers AI',
-        providerName: 'cloudflare',
-        baseUrl: 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1',
-        model: '@cf/zai-org/glm-5.2',
-        contextWindow: 262144,
-        supportsStreamUsageOptions: false,
-        accountId: '',
-        gatewayId: '',
-        apiKey: '',
-        apiKeyUrl: 'https://dash.cloudflare.com/profile/api-tokens',
-        enabled: false,
-      },
-      mistral: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'Mistral AI',
-        providerName: 'mistral',
-        baseUrl: 'https://api.mistral.ai/v1',
-        model: 'mistral-medium-3.5',
-        inputCostPerMillionUsd: 1.5,
-        outputCostPerMillionUsd: 7.5,
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://console.mistral.ai/api-keys/',
-        enabled: false,
-      },
-      deepseek: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'DeepSeek',
-        providerName: 'deepseek',
-        baseUrl: DEEPSEEK_BASE_URL,
-        model: DEEPSEEK_DEFAULT_MODEL,
-        contextWindow: 1000000,
-        maxOutputTokens: 384000,
-        // `deepseek-flash` off-peak list price, CNY per 1M tokens: 1 input,
-        // 0.02 cache-hit input, 4 output (peak is 2 / 0.04 / 8), converted at
-        // 1 USD = 7.1 CNY.
-        // https://api-docs.deepseek.com/zh-cn/quick_start/pricing
-        inputCostPerMillionUsd: 0.14,
-        cacheReadCostPerMillionUsd: 0.0028,
-        outputCostPerMillionUsd: 0.56,
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://platform.deepseek.com/api_keys',
-        enabled: false,
-      },
-      xai: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'xAI Grok',
-        providerName: 'xai',
-        baseUrl: 'https://api.x.ai/v1',
-        model: 'grok-4.6',
-        inputCostPerMillionUsd: 2,
-        outputCostPerMillionUsd: 6,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://console.x.ai/',
-        enabled: false,
-      },
-      nvidia: {
-        type: 'openai',
-        category: 'router',
-        label: 'Nvidia NIM',
-        providerName: 'nvidia',
-        baseUrl: 'https://integrate.api.nvidia.com/v1',
-        model: 'nvidia/nemotron-3-super-120b-a12b',
-        inputCostPerMillionUsd: 0.22,
-        outputCostPerMillionUsd: 0.22,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://build.nvidia.com/',
-        enabled: false,
-      },
-      groq: {
-        type: 'openai',
-        category: 'router',
-        label: 'Groq',
-        providerName: 'groq',
-        baseUrl: 'https://api.groq.com/openai/v1',
-        model: 'openai/gpt-oss-120b',
-        inputCostPerMillionUsd: 0.15,
-        outputCostPerMillionUsd: 0.6,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://console.groq.com/keys',
-        enabled: false,
-      },
-      minimax: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'MiniMax',
-        providerName: 'minimax',
-        baseUrl: 'https://api.minimax.chat/v1',
-        model: 'MiniMax-M3',
-        apiKey: '',
-        apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
-        enabled: false,
-      },
-      kimi: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'Kimi',
-        providerName: 'kimi',
-        baseUrl: 'https://api.moonshot.ai/v1',
-        model: 'kimi-k3',
-        supportsStreamUsageOptions: true,
-        omitTemperature: true,
-        compat: { maxTokensField: 'max_completion_tokens' },
-        apiKey: '',
-        apiKeyUrl: 'https://platform.kimi.ai/console/api-keys',
-        enabled: false,
-      },
-      alibaba: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'Alibaba Cloud (Qwen)',
-        providerName: 'alibaba',
-        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        model: 'qwen3.8-max',
-        supportsStreamUsageOptions: true,
-        apiKey: '',
-        apiKeyUrl: 'https://dashscope.console.aliyun.com/apiKey',
-        enabled: false,
-      },
-      together: {
-        type: 'openai',
-        category: 'router',
-        label: 'Together AI',
-        providerName: 'together',
-        baseUrl: 'https://api.together.xyz/v1',
-        model: 'moonshotai/Kimi-K3',
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://api.together.ai/settings/api-keys',
-        enabled: false,
-      },
-      openrouter: {
-        type: 'openai',
-        category: 'router',
-        label: 'OpenRouter',
-        providerName: 'openrouter',
-        baseUrl: 'https://openrouter.ai/api/v1',
-        model: OPENROUTER_DEFAULT_MODEL,
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://openrouter.ai/keys',
-        enabled: false,
-      },
-      huggingface: {
-        type: 'openai',
-        category: 'router',
-        label: 'Hugging Face Inference',
-        providerName: 'huggingface',
-        baseUrl: 'https://router.huggingface.co/v1',
-        model: 'moonshotai/Kimi-K3',
-        supportsStreamUsageOptions: true,
-        apiKey: '',
-        apiKeyUrl: 'https://huggingface.co/settings/tokens',
-        enabled: false,
-      },
-      fireworks: {
-        type: 'openai',
-        category: 'router',
-        label: 'Fireworks',
-        providerName: 'fireworks',
-        baseUrl: 'https://api.fireworks.ai/inference/v1',
-        model: 'accounts/fireworks/models/kimi-k3',
-        supportsStreamUsageOptions: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://fireworks.ai/account/api-keys',
-        enabled: false,
-      },
-      z_ai: {
-        type: 'openai',
-        category: 'cloud',
-        label: 'z.ai GLM',
-        providerName: 'z_ai',
-        baseUrl: 'https://api.z.ai/api/paas/v4',
-        model: 'glm-5.3',
-        contextWindow: 1000000,
-        inputCostPerMillionUsd: 1.4,
-        cacheReadCostPerMillionUsd: 0.26,
-        outputCostPerMillionUsd: 4.4,
-        supportsToolStreamOption: true,
-        supportsAskStreaming: true,
-        apiKey: '',
-        apiKeyUrl: 'https://docs.z.ai/guides/overview/quick-start',
-        enabled: false,
-      },
-      ...ADDITIONAL_PROVIDER_DEFAULTS,
-    };
-    return defaults;
+    return { [SELF_HOSTED_PROVIDER_ID]: { ...SELF_HOSTED_DEFAULT } };
   }
 
   // The Local OpenAI-compatible Proxy shipped with the 16k local window,
@@ -1279,30 +679,7 @@ export class ProviderManager {
           : 'auto');
       delete normalizedConfig.supportsVision;
     }
-    switch (normalizedConfig.type) {
-      case 'llamacpp':
-        return new LlamaCppProvider(normalizedConfig);
-      case 'openai':
-        // All non-local DeepSeek cards use the dedicated capability hooks. Only
-        // direct cards opt into DeepSeek's native request contract; router cards
-        // retain their existing OpenRouter compatibility preset.
-        return (isDirectDeepSeekConfig(normalizedConfig)
-          || (normalizedConfig.category !== 'local' && isDeepSeekModel(normalizedConfig.model)))
-          ? new DeepSeekProvider(normalizedConfig)
-          : new OpenAICompatibleProvider(normalizedConfig);
-      case 'azure_openai':
-        return new AzureOpenAIProvider(normalizedConfig);
-      case 'aws_bedrock':
-        return new AwsBedrockProvider(normalizedConfig);
-      case 'anthropic':
-        return new AnthropicProvider(normalizedConfig);
-      case 'anthropic_oauth':
-        return new AnthropicOAuthProvider(normalizedConfig);
-      case 'vertex_anthropic':
-        return new VertexAnthropicProvider(normalizedConfig);
-      default:
-        throw new Error(`Unknown provider type: ${normalizedConfig.type}`);
-    }
+    return new OpenAICompatibleProvider(normalizedConfig);
   }
 
   /**
@@ -1318,6 +695,7 @@ export class ProviderManager {
 
   /** Get a provider without changing the user's globally selected provider. */
   getProvider(id) {
+    if (WEBBRAIN_CLOUD_PROVIDER_IDS.has(id)) return null;
     const provider = this.providers.get(id);
     if (!provider) throw new Error(`Provider not found: ${id}`);
     return provider;
@@ -1330,17 +708,7 @@ export class ProviderManager {
    * id (not providerName): duplicates share one providerName, and some
    * built-ins have none at all.
    */
-  consentedShareProviderIds() {
-    const ids = new Set();
-    try {
-      for (const [id, provider] of this.providers?.entries?.() || []) {
-        if (provider?.config?.shareQueriesForResearch !== true) continue;
-        const pid = String(provider.config._providerId || id || '');
-        if (pid) ids.add(pid);
-      }
-    } catch {}
-    return ids;
-  }
+  consentedShareProviderIds() { return new Set(); }
 
   async _fetchVisionCapability(providerId, provider, identity) {
     const root = identity.baseUrl.replace(/\/v1$/i, '');
@@ -1641,7 +1009,7 @@ export class ProviderManager {
     }
     const merged = {
       ...current,
-      ...updates,
+      ...ownProvider({ ...current, ...updates }, id),
       configured: !WEBBRAIN_CLOUD_PROVIDER_IDS.has(id) && (markConfigured || current.configured === true),
     };
     if (Object.hasOwn(updates, 'manualContextWindow')) {
@@ -1781,7 +1149,7 @@ export class ProviderManager {
       const source = this.providers.get(sourceId);
       this.activeProviderId = source && (WEBBRAIN_CLOUD_PROVIDER_IDS.has(sourceId) || source.config?.configured === true)
         ? sourceId
-        : WEBBRAIN_CLOUD_PROVIDER_ID;
+        : SELF_HOSTED_PROVIDER_ID;
     }
     try {
       if (duplicate.config?.shareQueriesForResearch === true) {

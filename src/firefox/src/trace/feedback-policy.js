@@ -7,7 +7,7 @@ export const FEEDBACK_RUN_BYTES = 128 * 1024;
 // Automatic diagnostics must never inherit a stale lossless preference.
 export function feedbackRecordingPolicy(settings, forced = false) {
   const feedbackOnly = !forced && settings.tracingEnabled !== true
-    && settings[FEEDBACK_DIAGNOSTICS_KEY] !== false;
+    && settings[FEEDBACK_DIAGNOSTICS_KEY] === true;
   return {
     enabled: forced || settings.tracingEnabled === true || feedbackOnly,
     feedbackOnly,

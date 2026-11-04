@@ -127,16 +127,17 @@ export async function transcribeAudio(providers, audioBlob, opts = {}) {
   if (!audioBlob || audioBlob.size === 0) {
     return { ok: false, error: 'Transcription: empty audio blob.' };
   }
+  if (!String(audioBlob.type || '').startsWith('audio/')) return { ok: false, error: 'Video recordings are not uploaded for transcription. Record audio only.' };
   // Explicit Providers → Speech override wins over the
   // auto-pick path. When the user has bothered to fill in a base URL +
   // model, that's a strong signal that they want THOSE rather than the
   // first OpenAI-compatible provider in their list.
   const override = await readTranscriptionOverride();
-  const picked = override || pickProvider(providers);
+  const picked = override;
   if (!picked) {
     return {
       ok: false,
-      error: 'No Whisper-compatible provider configured. Add an API key to OpenAI (whisper-1) or Groq (whisper-large-v3) in Providers → LLM, OR set an explicit transcription endpoint in Providers → Speech, then re-record.',
+      error: 'Configure your own transcription endpoint in Providers → Speech first.',
     };
   }
 
@@ -176,7 +177,7 @@ export async function transcribeAudio(providers, audioBlob, opts = {}) {
   const start = Date.now();
   let res;
   try {
-    res = await fetchWithFallback(url, { method: 'POST', headers, body: form });
+    res = await fetchWithFallback(url, { method: 'POST', headers, body: form, credentials: 'omit', redirect: 'error' });
   } catch (e) {
     return { ok: false, error: `Transcription network error: ${e.message || e}` };
   }

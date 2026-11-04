@@ -597,7 +597,7 @@ loadSiteAdapters();
 
 async function loadResearchEscalation() {
   const stored = await browser.storage.local.get(['researchEscalationEnabled', 'researchEscalationEngine']);
-  agent.researchEscalationEnabled = stored.researchEscalationEnabled === true;
+  agent.researchEscalationEnabled = false;
   agent.researchEscalationEngine = String(stored.researchEscalationEngine || 'chatgpt');
 }
 const researchEscalationReady = loadResearchEscalation().catch(() => {});
@@ -786,14 +786,14 @@ async function saveUserMemoryExtractionQueue(queue) {
 async function isUserMemoryExtractionEnabled() {
   const stored = await browser.storage.local.get({
     [USER_MEMORY_ENABLED_KEY]: true,
-    [USER_MEMORY_AUTO_CAPTURE_KEY]: true,
+    [USER_MEMORY_AUTO_CAPTURE_KEY]: false,
   });
   return stored[USER_MEMORY_ENABLED_KEY] !== false
     && stored[USER_MEMORY_AUTO_CAPTURE_KEY] === true;
 }
 
 async function isUserMemoryFormCaptureEnabled() {
-  const stored = await browser.storage.local.get({ [USER_MEMORY_FORM_CAPTURE_KEY]: true });
+  const stored = await browser.storage.local.get({ [USER_MEMORY_FORM_CAPTURE_KEY]: false });
   return stored[USER_MEMORY_FORM_CAPTURE_KEY] === true;
 }
 
@@ -958,8 +958,13 @@ async function enqueueUserMemoryExtraction(payload = {}) {
     2000,
   );
   if (!userText || !assistantText) return { queued: false, reason: 'empty' };
+  const providerId = String(payload.providerId || providerManager.activeProviderId || '');
+  const owner = providerManager.providers.get(providerId);
+  if (!owner || !owner.config.baseUrl) return { queued: false, reason: 'provider_unavailable' };
+  if (payload.providerBaseUrl !== undefined && (payload.providerBaseUrl !== owner.config.baseUrl || payload.providerModel !== owner.config.model)) return { queued: false, reason: 'provider_changed' };
   await updateUserMemoryExtractionQueue((queue) => {
     queue.push({
+      providerId, providerBaseUrl: owner.config.baseUrl, providerModel: owner.config.model,
       id: `memjob_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       userText,
       assistantText,
@@ -1000,7 +1005,11 @@ async function drainUserMemoryExtractionQueue() {
         await customSkillsReady;
         if (providerManager.providers.size === 0) await providerManager.load();
         const store = await userMemoryStore.load();
-        const provider = providerManager.getActive();
+        const provider = job.providerId ? providerManager.providers.get(job.providerId) : null;
+        if (!provider || provider.config.baseUrl !== job.providerBaseUrl || provider.config.model !== job.providerModel) {
+          await removeUserMemoryExtractionJob(job.id);
+          continue;
+        }
         const costState = agent._newCostRunState();
         const result = await agent._chatWithCostAllowance(provider, buildUserMemoryExtractionMessages({
           userText: job.userText,
@@ -1287,7 +1296,7 @@ browser.storage.onChanged.addListener((changes, areaName) => {
   }
   if (changes.researchEscalationEnabled || changes.researchEscalationEngine) {
     if (changes.researchEscalationEnabled) {
-      agent.researchEscalationEnabled = changes.researchEscalationEnabled.newValue === true;
+      agent.researchEscalationEnabled = false;
     }
     if (changes.researchEscalationEngine) {
       agent.researchEscalationEngine = String(changes.researchEscalationEngine.newValue || 'chatgpt');
@@ -3141,7 +3150,7 @@ async function handleMessage(msg, sender) {
   if (['chat_start', 'chat', 'chat_stream'].includes(msg.action)) assertChatRequestInput(msg);
   if (msg.action === 'get_page_monitor_state') return agent.pageMonitorState(sender, msg.documentToken, msg.frameName);
   if (msg.action === 'page_feedback') return agent.observePageFeedback(sender, msg.feedback);
-  if (String(msg.action || '').startsWith('feedback_')) return feedbackHandoff.handle(msg, sender);
+  if (String(msg.action || '').startsWith('feedback_')) return { ok: false, error: 'Feedback uploads are removed from this build.' };
   if (msg.action === 'chat_steer') {
     // Content scripts must never turn page text into a trusted human correction.
     if (sender?.url?.split(/[?#]/)[0] !== browser.runtime.getURL('src/ui/sidepanel.html')) {
@@ -3219,8 +3228,8 @@ async function handleMessage(msg, sender) {
       const store = await userMemoryStore.load();
       const settings = await browser.storage.local.get({
         [USER_MEMORY_ENABLED_KEY]: true,
-        [USER_MEMORY_AUTO_CAPTURE_KEY]: true,
-        [USER_MEMORY_FORM_CAPTURE_KEY]: true,
+        [USER_MEMORY_AUTO_CAPTURE_KEY]: false,
+        [USER_MEMORY_FORM_CAPTURE_KEY]: false,
         [USER_MEMORY_MAX_PROMPT_CHARS_KEY]: normalizeUserMemoryMaxPromptChars(),
       });
       return {
@@ -3641,7 +3650,8 @@ async function handleMessage(msg, sender) {
             mode: effectiveMode,
             succeeded: runUpdatesSucceeded(updates),
           });
-          userMemoryPayload.conversationId = await agent.getConversationId(tabId);
+          Object.assign(userMemoryPayload, runMemoryIdentity);
+        userMemoryPayload.conversationId = await agent.getConversationId(tabId);
           userMemoryTurnContextTaken = true;
           enqueueUserMemoryExtractionAfterTurn(userMemoryPayload);
         }
@@ -3728,6 +3738,7 @@ async function handleMessage(msg, sender) {
           mode,
           succeeded: runUpdatesSucceeded(updates),
         });
+        Object.assign(userMemoryPayload, runMemoryIdentity);
         userMemoryPayload.conversationId = await agent.getConversationId(tabId);
         userMemoryTurnContextTaken = true;
         enqueueUserMemoryExtractionAfterTurn(userMemoryPayload);
@@ -3806,6 +3817,7 @@ async function handleMessage(msg, sender) {
           mode: effectiveMode,
           succeeded: runUpdatesSucceeded(updates),
         });
+        Object.assign(userMemoryPayload, runMemoryIdentity);
         userMemoryPayload.conversationId = await agent.getConversationId(tabId);
         userMemoryTurnContextTaken = true;
         enqueueUserMemoryExtractionAfterTurn(userMemoryPayload);

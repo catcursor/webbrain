@@ -70,3 +70,6 @@ build/
 
 # Mobile app (local dev)
 mobile/
+
+# Self-hosted release archives are published by GitHub Actions.
+/dist/self-hosted/

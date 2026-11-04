@@ -113,6 +113,6 @@ async function loadCommunication() {
   }
 }
 
-if (typeof document !== 'undefined') void loadCommunication();
+// Remote bulletins are removed from this build.
 
 export { communicationDocument, communicationUrl, isRenderableMarkup };

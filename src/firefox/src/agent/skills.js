@@ -17,11 +17,6 @@ const PRIVILEGED_BUILT_IN_SKILL_TOOL_NAMES = new Set([
 ]);
 export const PACKAGED_SKILL_SOURCES = Object.freeze([
   Object.freeze({
-    id: 'freeskillz-xyz',
-    name: 'FreeSkillz.xyz',
-    path: 'skills/freeskillz-xyz.md',
-  }),
-  Object.freeze({
     id: 'disposable-email-mailtm',
     name: 'Disposable email (Mail.tm)',
     path: 'skills/disposable-email-mailtm.md',
@@ -129,7 +124,6 @@ export const PACKAGED_SKILL_SOURCES = Object.freeze([
 ]);
 export const DEFAULT_SKILL_SOURCES = Object.freeze(
   PACKAGED_SKILL_SOURCES.filter((source) => [
-    'freeskillz-xyz',
     'otp-verification-code-helper',
     'humanizer',
     'wordpress-rest-api',
@@ -161,9 +155,9 @@ export function removeRetiredPackagedSkills(value) {
   // Match the retired packaged provenance exactly so a user-authored skill
   // that happens to reuse the old id remains intact.
   return skills.filter((skill) => !(
-    skill?.id === 'chrome-web-store-release'
+    ['chrome-web-store-release', 'freeskillz-xyz'].includes(skill?.id)
     && skill?.sourceType === 'built-in'
-    && cleanSingleLine(skill?.sourceUrl || skill?.path) === 'skills/chrome-web-store-release.md'
+    && ['skills/chrome-web-store-release.md', 'skills/freeskillz-xyz.md'].includes(cleanSingleLine(skill?.sourceUrl || skill?.path))
   ));
 }
 

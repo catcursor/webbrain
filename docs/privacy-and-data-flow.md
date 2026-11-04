@@ -1,3 +1,5 @@
+> This fork removes the hosted defaults and extra upload services described below. See [Self-hosted build](SELF_HOSTED.md) for its current behavior. The remainder documents upstream features.
+
 # Privacy & Data Flow
 
 ---

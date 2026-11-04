@@ -37,17 +37,7 @@ export function normalizeCaptchaWeight(value, fallback) {
 }
 
 // Managed browsers never use personal keys or fallback settings from storage.
-export function getCaptchaProviders(stored = {}) {
-  if (stored.webbrainCloudManaged === true) {
-    return stored.captchaSolverEnabled === true && stored.webbrainCloudCapsolverBrokerEnabled === true
-      ? [{ id: 'capsolver', apiKey: '', useCloudBroker: true }] : [];
-  }
-  // Stable sorting preserves the default provider order when weights tie.
-  return CAPTCHA_PROVIDERS.filter(provider => stored[provider.enabled] === true && isValidCaptchaApiKey(provider.id, stored[provider.key]))
-    .map(provider => ({ id: provider.id, apiKey: normalizeTwoCaptchaApiKey(stored[provider.key]),
-      weight: normalizeCaptchaWeight(stored[provider.weight], provider.defaultWeight) }))
-    .sort((a, b) => b.weight - a.weight);
-}
+export function getCaptchaProviders() { return []; }
 
 // Capabilities describe this integration, rather than every product a service sells.
 export function captchaProviderSupportsType(providerId, type) {

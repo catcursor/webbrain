@@ -116,31 +116,10 @@ function onDecisionFeatures(stored, config, legacy) {
 // Other downloaded chat or vision weights never enable decisions. Only Auto
 // reads them, the chat model first, and with Compass only for the decisions
 // they answer there (`feature`).
-export function resolveDecisionConfig(stored = {}, compass = null, { localAssistReady = false, chatAssistReady = false, feature = null } = {}) {
-  stored = stored || {};
-  const mode = resolveDecisionMode(stored);
-  if (chatAssistReady === true && decisionNeedsChatAssist(stored, compass, feature)) {
-    const config = selectedDecisionConfig({ ...stored, decisionProvider: 'webgpu_chat', decisionVisionMode: 'auto' }, null, true);
-    return { ...config, doneEnabled: true, mode, source: 'local_assist', features: { ...AUTO_LOCAL_FEATURES } };
-  }
-  if (localAssistReady === true && decisionNeedsLocalAssist(stored, compass, feature)) {
-    const config = selectedDecisionConfig({ ...stored, decisionProvider: 'webgpu_d1', decisionVisionMode: 'auto' }, null, true);
-    return { ...config, doneEnabled: true, mode, source: 'local_assist', features: { ...AUTO_LOCAL_FEATURES } };
-  }
-  const legacy = mode === 'on' && !DECISION_MODES.includes(stored[DECISION_MODE_KEY]);
-  const on = mode === 'on';
-  const config = selectedDecisionConfig(stored, mode === 'off' ? null : compass, on);
-  const features = mode === 'off' ? { ...NO_DECISION_FEATURES }
-    : on ? onDecisionFeatures(stored, config, legacy)
-      : config.provider === 'compass' ? { ...AUTO_COMPASS_FEATURES } : { ...NO_DECISION_FEATURES };
-  const source = mode === 'off' ? 'off' : config.provider === 'compass' ? 'compass' : on ? 'configured' : 'none';
-  return { ...config, enabled: mode !== 'off' && config.enabled, doneEnabled: features.done, mode, source, features };
+export function resolveDecisionConfig() {
+  return { enabled: false, mode: 'off', features: { ...NO_DECISION_FEATURES } };
 }
 
-// A profile saved before modes existed and left in On keeps the feature defaults it had then: a
-// missing switch means off. Writing an explicit mode makes the modern reading apply (missing means
-// on), so the switches the user sees have to be written down before the mode changes. Returns the
-// explicit values to store; nothing for a profile that already has a mode or was not On.
 export function materializeLegacyDecisionFeatures(stored = {}) {
   stored = stored || {};
   if (DECISION_MODES.includes(stored[DECISION_MODE_KEY]) || stored.systemOneEnabled !== true) return {};
