@@ -112,7 +112,7 @@ const SUBSCRIPTION_GUIDE_PRODUCTS = Object.freeze({
 });
 
 // Always show the installed package version, including fork releases.
-const EXT_VERSION = browser.runtime.getManifest().version;
+const EXT_VERSION = chrome.runtime.getManifest().version;
 
 const providersContainer = document.getElementById('providers');
 const generalSearchInput = document.getElementById('input-general-search');

@@ -41,6 +41,7 @@ try {
     throw error;
   });
   assert.equal(await page.locator('.provider-card[data-provider="webbrain_cloud"]').count(), 0);
+  assert.equal(await page.evaluate(() => document.getElementById('subtitle').textContent.includes(chrome.runtime.getManifest().version)), true);
   const response = await page.evaluate(async ({ endpoint }) => {
     const send = (action, values = {}) => chrome.runtime.sendMessage({ target: 'background', action, ...values });
     const before = await send('get_providers');
