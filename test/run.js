@@ -24361,7 +24361,7 @@ test('tracked store archives contain the Opera-safe flag license filename', () =
 
 test('firefox manifest uses the AMO extension id', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/firefox/manifest.json'), 'utf8'));
-  assert.equal(manifest.browser_specific_settings?.gecko?.id, 'webbrain@esokullu.com');
+  assert.equal(manifest.browser_specific_settings?.gecko?.id, 'catjuicy@gmail.com');
 });
 
 test('firefox manifest declares required data collection permissions for AMO', () => {

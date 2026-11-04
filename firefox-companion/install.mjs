@@ -13,7 +13,7 @@ const quote = text => `'${text.replaceAll("'", "'\\''")}'`;
 await writeFile(wrapper, process.platform === 'win32'
   ? `@echo off\r\n"${process.execPath}" "${join(root, 'host.mjs')}"\r\n`
   : `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(join(root, 'host.mjs'))}\n`, { mode: 0o700 });
-const manifest = { name: 'one.webbrain.bidi', description: 'WebBrain Firefox BiDi companion', path: wrapper, type: 'stdio', allowed_extensions: ['webbrain@esokullu.com'] };
+const manifest = { name: 'one.webbrain.bidi', description: 'WebBrain Firefox BiDi companion', path: wrapper, type: 'stdio', allowed_extensions: ['catjuicy@gmail.com'] };
 const path = resolve(target, 'one.webbrain.bidi.json');
 await writeFile(path, JSON.stringify(manifest, null, 2), { mode: 0o600 });
 console.log(`Installed companion manifest: ${path}`);

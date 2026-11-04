@@ -473,7 +473,7 @@ test('installer and native launcher preserve Firefox message framing and command
     const spawnHost = input => process.platform === 'win32'
       ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/c', manifest.path], { input, timeout: 5000 })
       : spawnSync(manifest.path, [], { input, timeout: 5000 });
-    assert.deepEqual(manifest.allowed_extensions, ['webbrain@esokullu.com']);
+    assert.deepEqual(manifest.allowed_extensions, ['catjuicy@gmail.com']);
     const message = Buffer.from(JSON.stringify({ id: 12, command: 'script.evaluate', expression: 'arbitrary code' }));
     const header = Buffer.alloc(4); header.writeUInt32LE(message.length);
     const result = spawnHost(Buffer.concat([header, message]));

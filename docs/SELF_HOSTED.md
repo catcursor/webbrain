@@ -1,5 +1,7 @@
 # Self-hosted build
 
+The Firefox add-on ID is `catjuicy@gmail.com`.
+
 This fork supports only explicitly configured OpenAI-compatible APIs. Open **Providers**, fill in your API Base URL (including `/v1` when required), optional API key and model name, then save and test. Use **Load models** to query your own endpoint and **Duplicate** for another endpoint. Enable image support on the provider only when the chosen model supports it.
 
 There is no default hosted API, no cloud fallback and no automatic model download. The former provider catalog is removed. Upgrading retains the selected local runtime as a generic OpenAI-compatible card; former hosted cards are dropped. The first upgrade clears legacy sharing and memory-extraction queues, disables automatic memory/debug recording and cloud sync, resets auxiliary model configurations, and enables screenshot redaction. Explicitly saved local memory remains local and can still enter your chosen model's context.

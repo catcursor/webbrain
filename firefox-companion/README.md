@@ -34,7 +34,7 @@ The connection test checks the real BiDi session. It does not submit forms or se
 
 Target markers bind the extension-selected page element to a BiDi shared node. Duplicate or stale bindings fail. Existing permission, recipient, toolbar and dispatch guards run before target preparation. Native input rechecks connection, run ownership, and target visibility before dispatch. Page DOM is not a security boundary against a hostile page rearranging itself between validation and input; existing prompt-injection and action-authorization checks remain necessary.
 
-The host stores temporary upload files only for its connection lifetime and deletes them on normal shutdown. A forced process kill can leave `webbrain-bidi-*` directories in the OS temporary directory. It does not log file bytes or typed text. Only the extension ID `webbrain@esokullu.com` is allowed to connect to the native host.
+The host stores temporary upload files only for its connection lifetime and deletes them on normal shutdown. A forced process kill can leave `webbrain-bidi-*` directories in the OS temporary directory. It does not log file bytes or typed text. Only the extension ID `catjuicy@gmail.com` is allowed to connect to the native host.
 
 ## Testing
 
