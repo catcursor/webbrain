@@ -27,7 +27,7 @@ try {
   context = await chromium.launchPersistentContext(profile, { executablePath, channel: 'chromium', headless: true, ignoreDefaultArgs: ['--disable-extensions'],
     args: ['--no-sandbox', '--disable-extensions-except=' + extension, '--load-extension=' + extension] });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', { timeout: 30000 });
-  const extensionOrigin = new URL(worker.url()).origin;
+  const extensionOrigin = `chrome-extension://${new URL(worker.url()).hostname}`;
   const failures = [];
   const external = [];
   context.on('request', request => { if (/^https?:/.test(request.url()) && !request.url().startsWith(`http://127.0.0.1:${server.address().port}/`)) external.push(request.url()); });
