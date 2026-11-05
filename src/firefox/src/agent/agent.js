@@ -759,8 +759,8 @@ export class Agent extends LoopDetector {
     // Seconds to wait on clarify() before auto-picking the first option.
     // 0 = instant auto-select; 1–1200 = wait N seconds; -1 = Off (wait forever).
     // Permission/form-submit prompts are never timed out.
-    // Loaded from browser.storage.local in background.js (default 60).
-    this.clarifyTimeoutSec = 60;
+    // Loaded from browser.storage.local in background.js (default: wait forever).
+    this.clarifyTimeoutSec = -1;
     // Settings → Budgets → "When a question times out": 'finish' (default)
     // keeps the task moving, 'safe' takes the safe default. See clarify-timeout.js.
     this.clarifyTimeoutPolicy = 'finish';
@@ -7561,12 +7561,14 @@ export class Agent extends LoopDetector {
     const binding = this._activeTaskBinding(messages);
     const task = messages[binding.index];
     const provider = this._activeProvider(tabId);
-    const runId = this.currentRunId.get(tabId);
-    if (!task || !binding.text || !provider || !runId) return null;
+    // UI ownership must also work when optional trace recording is disabled.
+    const runId = this.currentRunId.get(tabId) || null;
+    const taskToken = this._taskTokens.get(tabId) || null;
+    if (!task || !binding.text || !provider || (!runId && !taskToken)) return null;
     try {
       return { task, taskSha: this._sha256TextSync(binding.text), provider,
         providerSha: this._sha256TextSync(JSON.stringify([provider.model, provider.config])),
-        runId, abortState: this._runAbortStates.get(tabId),
+        runId, taskToken, abortState: this._runAbortStates.get(tabId),
         generation: this._systemOneGenerations?.get(tabId) || 0,
         steering: this._steeringRuns.get(tabId) || null,
         revision: this._steeringRuns.get(tabId)?.revision || 0 };
@@ -7641,7 +7643,7 @@ export class Agent extends LoopDetector {
     for (const [clarifyId, entry] of this._pendingClarifications.get(tabId) || []) {
       const saved = entry.uiCurrentClarification, previous = saved?.authority;
       if (entry.settled || !previous || !['task', 'taskSha', 'provider', 'providerSha',
-          'runId', 'abortState', 'generation', 'steering', 'revision'].every(key => previous[key] === current[key])) continue;
+          'runId', 'taskToken', 'abortState', 'generation', 'steering', 'revision'].every(key => previous[key] === current[key])) continue;
       const data = structuredClone(saved.display);
       if (entry.timeoutSec > 0 && entry.deadlineTs > 0) {
         data.timeoutSec = entry.timeoutSec;
@@ -20059,7 +20061,7 @@ Rules: no prose intro, no conclusion, no "this screenshot shows...", no layout d
   /**
    * Normalize clarify auto-timeout from settings.
    * Returns 0 (instant auto-select), 1–1200 (wait N seconds), or -1 (Off /
-   * wait forever). Invalid values fall back to the product default of 60s.
+   * wait forever). Invalid values fall back to waiting for the user.
    * Stored slider values above 1200 mean Off.
    */
   // Settings → Advanced → "Strict checks": every quality guard blocks again.
@@ -20245,7 +20247,7 @@ Rules: no prose intro, no conclusion, no "this screenshot shows...", no layout d
 
   _normalizeClarifyTimeoutSec(value) {
     const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) return 60;
+    if (value == null || String(value).trim() === '' || !Number.isFinite(n) || n < 0) return -1;
     const sec = Math.floor(n);
     if (sec > 1200) return -1;
     return Math.min(1200, sec);

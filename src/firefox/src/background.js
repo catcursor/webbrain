@@ -517,7 +517,7 @@ const CLARIFY_TIMEOUT_OFF_SLIDER = 1205;
 
 function normalizeClarifyTimeoutSec(value) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return 60;
+  if (value == null || String(value).trim() === '' || !Number.isFinite(n) || n < 0) return -1;
   const sec = Math.floor(n);
   if (sec > 1200) return -1;
   return Math.min(1200, sec);
@@ -526,12 +526,20 @@ function normalizeClarifyTimeoutSec(value) {
 async function loadClarifyTimeout() {
   let stored;
   try {
-    stored = await browser.storage.local.get(['clarifyTimeoutSec', 'clarifyTimeoutSemanticsV2', 'clarifyTimeoutPolicy']);
+    stored = await browser.storage.local.get(['clarifyTimeoutSec', 'clarifyTimeoutSemanticsV2', 'clarifyTimeoutPolicy', 'selfHostedManualChoicesV1']);
   } catch (error) {
     // The user's choice could not be read: until a later load succeeds, a
     // timeout takes the safe answer rather than the finish default.
     agent.clarifyTimeoutPolicy = 'safe';
     throw error;
+  }
+  // Existing installs may have Instant or an automatic timeout saved. This
+  // personal build waits for a human choice by default; migrate only once.
+  if (stored.selfHostedManualChoicesV1 !== true) {
+    stored.clarifyTimeoutSec = CLARIFY_TIMEOUT_OFF_SLIDER;
+    stored.clarifyTimeoutSemanticsV2 = true;
+    await browser.storage.local.set({ selfHostedManualChoicesV1: true,
+      clarifyTimeoutSec: CLARIFY_TIMEOUT_OFF_SLIDER, clarifyTimeoutSemanticsV2: true });
   }
   // One-shot: old 0 meant Off; new 0 means Instant and Off is >1200.
   if (!stored.clarifyTimeoutSemanticsV2) {
@@ -543,7 +551,7 @@ async function loadClarifyTimeout() {
     await browser.storage.local.set(updates).catch(() => {});
   }
   agent.clarifyTimeoutSec = normalizeClarifyTimeoutSec(
-    stored.clarifyTimeoutSec != null ? stored.clarifyTimeoutSec : 60,
+    stored.clarifyTimeoutSec != null ? stored.clarifyTimeoutSec : CLARIFY_TIMEOUT_OFF_SLIDER,
   );
   agent.clarifyTimeoutPolicy = stored.clarifyTimeoutPolicy === 'safe' ? 'safe' : 'finish';
 }

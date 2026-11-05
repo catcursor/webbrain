@@ -1,5 +1,8 @@
 // Supplement the personal build's Chinese interface where upstream falls back to English.
 export default {
+  "st.display.clarify_timeout.label": "等待用户选择",
+  "st.display.clarify_timeout.off": "一直等待",
+  "st.display.clarify_timeout.desc": "默认一直等待你的选择，不自动代选。只有手动开启超时后，才会按“问题超时时”的设置继续。0 表示立即自动选择，超过 1200 秒表示一直等待。权限和表单提交确认始终需要手动回答。",
   "st.bidi.title": "Firefox 可信自动化（实验性）",
   "st.bidi.desc": "使用本地辅助程序处理浏览器对话框、可信点击与输入以及文件上传。需要 Node.js 22+，并以远程自动化模式启动 Firefox。",
   "st.bidi.setup_html": "在 WebBrain 源码目录运行 <code>node firefox-companion/install.mjs</code> 安装辅助程序，再使用 <code>--remote-debugging-port 9222</code> 重启 Firefox。连接应仅限本机使用。",

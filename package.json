@@ -1,6 +1,6 @@
 {
   "name": "webbrain",
-  "version": "46.0.5",
+  "version": "46.0.6",
   "description": "Open-source AI browser agent \u2014 chat with pages, automate tasks, multi-provider LLM support.",
   "private": true,
   "type": "module",
@@ -116,8 +116,8 @@
     "test:bot-memory": "node --test test/bot-memory.mjs test/bot-memory-registries.mjs test/bot-memory-cloud-controller.mjs && node test/bot-memory-dom.mjs && node test/quality/cloud-bot-memory-mv3.mjs",
     "test:shared-action-guards": "node --test test/typing-preparation-geometry.mjs test/resource-mutation-guards.mjs test/action-guard-user-override.mjs test/guard-direct-override.mjs test/guard-override-persistence.mjs test/publication-user-override.mjs test/resource-mutation-clarification.mjs test/publication-override-target.mjs test/completion-steering-receipt-authority.mjs test/social-ui-navigation.mjs test/native-resource-deletion-binding.mjs test/native-mastodon-confirmation.mjs test/trusted-field-preparation-ownership.mjs test/guards-control-classification.mjs test/guards-unbound-deletion.mjs test/guards-steering-receipts.mjs && node test/quality/shared-action-guards-mv3.mjs",
     "test:guard-overrides": "node --test test/action-guard-user-override.mjs test/guard-direct-override.mjs test/guard-override-persistence.mjs test/publication-user-override.mjs test/resource-mutation-clarification.mjs test/publication-override-target.mjs",
-    "test:privacy": "node --test test/self-hosted-privacy.mjs test/provider-message-privacy.mjs test/conversation-persistence.mjs test/build-unpacked.mjs test/guard-policy.mjs",
-    "test:privacy:browser": "node test/self-hosted-browser.mjs",
+    "test:privacy": "node --test test/self-hosted-privacy.mjs test/self-hosted-clarify.mjs test/provider-message-privacy.mjs test/conversation-persistence.mjs test/build-unpacked.mjs test/guard-policy.mjs",
+    "test:privacy:browser": "node test/self-hosted-browser.mjs && node --test test/clarify-timeout-policy.mjs test/pending-clarification-hydration.mjs",
     "test:privacy:firefox": "node test/self-hosted-firefox.mjs",
     "build:privacy": "python3 scripts/build-private-release.py"
   },

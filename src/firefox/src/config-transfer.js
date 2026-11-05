@@ -34,7 +34,7 @@ export const DEFAULT_CONFIG_SETTINGS = Object.freeze({
   screenshotFallback: true,
   maxAgentSteps: 130,
   requestTimeoutMs: 120_000,
-  clarifyTimeoutSec: 60,
+  clarifyTimeoutSec: 1205,
   clarifyTimeoutSemanticsV2: true,
   clarifyTimeoutPolicy: 'finish',
   autoScreenshot: 'navigation',

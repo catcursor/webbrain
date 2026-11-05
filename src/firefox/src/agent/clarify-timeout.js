@@ -1,4 +1,5 @@
 // What WebBrain does when nobody answers a clarify question in time.
+// Automatic timeouts are off by default; this policy applies only if enabled.
 //
 // The user chooses this in Settings → Budgets ("When a question times out"):
 // - 'finish' (default) keeps the task moving. The option the model named as

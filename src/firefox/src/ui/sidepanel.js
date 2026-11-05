@@ -5780,7 +5780,7 @@ async function restorePendingCurrentClarification(tabId, state, assistantEl, sho
     return false;
   }
   if (current.tabId !== Number(tabId) || current.requestId !== requestId
-      || current.runId !== runId || !current.clarifyId || current.data?.clarifyId !== current.clarifyId) return false;
+      || String(current.runId || '') !== runId || !current.clarifyId || current.data?.clarifyId !== current.clarifyId) return false;
   const pending = current;
   invalidateUnresolvedClarifyCards(assistantEl, pending.clarifyId);
   const key = clarificationSubmissionKey(tabId, requestId, pending.clarifyId);

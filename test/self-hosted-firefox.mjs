@@ -6,6 +6,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { BidiSession } from '../firefox-companion/session.mjs';
+import { conformFixtureCompletionCall } from './quality/completion-provider-contract.mjs';
 
 const { firefox } = createRequire(import.meta.url)('playwright');
 const extension = path.resolve('src/firefox');
@@ -16,6 +17,16 @@ await fs.writeFile(path.join(profile, 'user.js'),
   `user_pref("extensions.webextensions.uuids", ${JSON.stringify(JSON.stringify({ [manifest.browser_specific_settings.gecko.id]: uuid }))});\n`);
 
 const requests = [];
+const actMarker = 'PRIVATE_ACT_CHOICE';
+const actRequests = [];
+const actRecovery = {};
+let actToolCalls = 0;
+const actIntent = { request_kind: 'execute', scope_relation: 'new', requires_state_change: false, requires_submission: false,
+  deliverables: ['Read the test page after the user chooses a method'], completion_requirements: {},
+  allows_planner_shaped_result: false, allows_app_state_tool_evidence: false, read_scope: 'visible_page',
+  summary: 'Ask which method to use, then read the test page.',
+  steps: [{ id: '1', action: 'Ask the user to choose method A or B.' }, { id: '2', action: 'Read the test page using that choice.' }],
+  memory: { use_progress_ledger: false, progress_action: null }, scheduling: null, risks: [] };
 const server = http.createServer(async (request, response) => {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
@@ -24,7 +35,36 @@ const server = http.createServer(async (request, response) => {
   response.setHeader('Access-Control-Allow-Headers', '*');
   response.setHeader('Content-Type', 'application/json');
   if (request.method === 'OPTIONS') { response.end(); return; }
+  if (request.url === '/act-page') {
+    response.setHeader('Content-Type', 'text/html; charset=utf-8');
+    response.end('<!doctype html><title>Owned Act choice fixture</title><p>PRIVATE_ACT_PAGE_TEXT: a harmless local test page.</p>');
+    return;
+  }
   const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+  if (JSON.stringify(body.messages || []).includes(actMarker)) {
+    actRequests.push(body);
+    const textOf = content => typeof content === 'string' ? content : JSON.stringify(content);
+    const system = textOf(body.messages[0]?.content || '');
+    let message;
+    if (system.startsWith('Evaluate only the observable requirements of the genuine user task')) {
+      message = { role: 'assistant', content: JSON.stringify({ outcome: 'succeeded', reason: 'The owned test page was read after the choice.' }) };
+    } else if (!body.tools?.length) {
+      message = { role: 'assistant', content: JSON.stringify(actIntent) };
+    } else {
+      const step = actToolCalls++;
+      const call = step === 0
+        ? { name: 'clarify', args: { question: '请选择完成方式', options: ['方式 A', '方式 B'], consequence: 'none', finish_option: '方式 A' } }
+        : step === 1
+          ? { name: 'get_accessibility_tree', args: { filter: 'all' } }
+          : { name: 'done', args: { outcome: 'success', summary: '已按方式 B 读取测试页面。' } };
+      const emitted = conformFixtureCompletionCall(body, call, actRecovery);
+      message = { role: 'assistant', content: '', tool_calls: [{ id: `private-act-${step}`, type: 'function',
+        function: { name: emitted.name, arguments: JSON.stringify(emitted.args) } }] };
+    }
+    response.end(JSON.stringify({ choices: [{ message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }],
+      usage: { prompt_tokens: 30, completion_tokens: 10 } }));
+    return;
+  }
   if (body.stream) {
     response.setHeader('Content-Type', 'text/event-stream');
     for (const content of ['PRIVATE_', 'FIREFOX_OK']) {
@@ -151,6 +191,9 @@ try {
   assert.equal(state.helpImproveWebBrain, false);
   assert.equal(state.userMemoryAutoCaptureEnabled, false);
   assert.equal(state.selfHostedPrivacyV1, true);
+  const choices = await evaluate('browser.storage.local.get(["clarifyTimeoutSec", "selfHostedManualChoicesV1"])');
+  assert.equal(choices.clarifyTimeoutSec, 1205);
+  assert.equal(choices.selfHostedManualChoicesV1, true);
   // Exercise the full conversation lifecycle, including its terminal journal.
   await evaluate(`(() => {
     globalThis.chatEvents = [];
@@ -193,6 +236,30 @@ try {
       assert.equal(terminal.runUi.status, 'completed', JSON.stringify(terminal));
       assert.equal(terminal.runUi.runSucceeded, true);
     }
+
+    // A genuine Act run must pause at the question and consume the selected answer.
+    await evaluate('browser.storage.local.set({ planReviewMode: "never", planBeforeActMode: "try" })');
+    const actTab = await evaluate(`browser.tabs.create({ url: ${JSON.stringify(endpoint.replace('/v1', '/act-page'))}, active: false })`);
+    await evaluate(`browser.runtime.sendMessage({ target: 'background', action: 'chat_start', tabId: ${actTab.id},
+      requestId: 'private-act-choice', mode: 'act', text: '${actMarker}: 先让我选择方式 A 或方式 B，等我选好后再读取当前页。' })`);
+    await waitFor('chatEvents.some(event => event.requestId === "private-act-choice" && event.type === "clarify")', 'Act presents its choice');
+    const prompt = await evaluate('chatEvents.find(event => event.requestId === "private-act-choice" && event.type === "clarify").data');
+    assert.equal(prompt.timeoutSec, 0, JSON.stringify(prompt));
+    assert.equal(prompt.timeoutAnswer, undefined);
+    const beforeAnswer = actRequests.length;
+    await new Promise(resolve => setTimeout(resolve, 1400));
+    assert.equal(actRequests.length, beforeAnswer, 'the model must not take another step while a choice is pending');
+    assert.equal(actToolCalls, 1);
+    const waiting = await evaluate(`browser.runtime.sendMessage({ target: 'background', action: 'agent_run_state', tabId: ${actTab.id}, requestId: 'private-act-choice' })`);
+    assert.equal(waiting.running, true, JSON.stringify(waiting));
+    assert.equal(waiting.pendingCurrentClarification?.clarifyId, prompt.clarifyId);
+    const selected = await evaluate(`browser.runtime.sendMessage({ target: 'background', action: 'clarify_response', tabId: ${actTab.id},
+      clarifyId: ${JSON.stringify(prompt.clarifyId)}, answer: '方式 B', source: 'option' })`);
+    assert.equal(selected.matched, true);
+    await waitFor('chatEvents.some(event => event.requestId === "private-act-choice" && event.type === "run_complete")', 'Act continues after the answer');
+    assert.ok(actRequests.some(input => input.messages.some(message => message.role === 'tool' && /"answer"\s*:\s*"方式 B"/.test(String(message.content)))));
+    const finished = await evaluate('chatEvents.findLast(event => event.requestId === "private-act-choice" && event.type === "run_complete").data');
+    assert.equal(finished.status, 'completed', JSON.stringify(finished));
   } catch (error) {
     console.error('Conversation diagnostics:', await evaluate('({ events: chatEvents, text: document.body.innerText })'));
     throw error;
@@ -200,6 +267,7 @@ try {
   console.log(JSON.stringify({ browser: 'Firefox extension', providerSettings: 'passed', saveAndReload: 'passed',
     modelList: 'passed', ownAPIConnection: 'passed', duplicateEndpoint: 'passed', sidePanel: 'passed',
     chineseInterface: 'passed', localeMigration: 'passed', chineseSelectionActions: 'passed',
+    actWaitsForChoice: 'passed', actResumesSelectedMethod: 'passed',
     askStreaming: 'passed', askNonStreaming: 'passed', legacyStreaming: 'passed', continuation: 'passed', version: manifest.version }));
 } finally {
   await session?.close();

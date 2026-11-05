@@ -52174,7 +52174,7 @@ test('clarify tool auto-timeout is configurable and mirrored across browsers', (
     const locale = fs.readFileSync(path.join(ROOT, paths.locale), 'utf8');
     const idLocale = fs.readFileSync(path.join(ROOT, paths.idLocale), 'utf8');
 
-    assert.match(agent, /this\.clarifyTimeoutSec = 60/, `${label}: agent default clarify timeout should be 60s`);
+    assert.match(agent, /this\.clarifyTimeoutSec = -1/, `${label}: agent choices should wait for the user by default`);
     assert.match(agent, /_normalizeClarifyTimeoutSec/, `${label}: agent should normalize clarify timeout (instant / wait / off)`);
     assert.match(agent, /if \(sec > 1200\) return -1/, `${label}: stored values above 1200 should normalize to Off (-1)`);
     assert.match(agent, /_settleClarification/, `${label}: clarify responses should settle once and clear timers`);

@@ -31,6 +31,7 @@ function fixture(build) {
   const agent = new build.Agent({ getActive: () => provider });
   const tab = 73, request = 'owned-current-request', runId = 'owned-current-runtime';
   agent._persist = () => {}; agent._runningTabs.add(tab); agent.currentRunId.set(tab, runId);
+  agent._taskTokens.set(tab, 'owned-task-token');
   agent.conversations.set(tab, [{ role: 'system', content: 'Owned fixture context.' }, { role: 'user', content: 'Inspect the owned test page.' }]);
   agent._beginSteeringRun(tab, () => {}, { detachedRequestId: request });
   agent.getConversationState = async () => ({ conversationId: 'owned-conversation' });
@@ -129,6 +130,26 @@ async function panel(f, options = {}) {
 }
 
 for (const build of builds) {
+  test(`${build.build}: a choice survives lost panel HTML when tracing is disabled`, async () => {
+    const f = fixture(build);
+    f.agent.currentRunId.delete(f.tab);
+    const wait = await f.ordinary(), p = await panel(f);
+    try {
+      assert.equal((await f.state()).pendingCurrentClarification.runId, null);
+      await p.apply();
+      assert.equal((await p.shape()).cards, 1);
+      await p.clearHtml();
+      await p.apply();
+      const shape = await p.shape();
+      assert.equal(shape.cards, 1);
+      assert.ok(shape.enabled > 0);
+      assert.equal(p.calls.some(call => call.action === 'clarify_response'), false);
+      assert.equal(wait.entry.settled, false);
+      await p.page.locator('.clarify-option').filter({ hasText: 'second' }).click();
+      assert.equal((await wait.promise).answer, 'second');
+      assert.equal(f.agent.activeRunState(f.tab).pendingCurrentClarification, null);
+    } finally { await p.close(); await f.close(); }
+  });
   test(`${build.build}: actual permission survives ACK, lost card HTML and repeated hydration without answering`, async () => {
     const f = fixture(build), wait = f.permission(), p = await panel(f);
     try {
@@ -149,7 +170,7 @@ for (const build of builds) {
     finally { await p.close(); await f.close(); }
   });
 
-  for (const change of ['settled', 'Stop', 'new-run', 'same-text-new-task', 'provider-object', 'provider-config', 'steering-revision', 'queued-steering', 'worker-loss']) {
+  for (const change of ['settled', 'Stop', 'new-run', 'new-task-token', 'same-text-new-task', 'provider-object', 'provider-config', 'steering-revision', 'queued-steering', 'worker-loss']) {
     test(`${build.build}: live descriptor refuses ${change}`, async () => {
       const f = fixture(build), wait = f.permission();
       const originalEntry = f.agent._pendingClarifications.get(f.tab).get(wait.prompt.clarifyId);
@@ -161,6 +182,7 @@ for (const build of builds) {
         if (change === 'settled') f.agent._settleClarification(f.agent._pendingClarifications.get(f.tab).get(wait.prompt.clarifyId), { cancelled: true });
         if (change === 'Stop') f.agent.abortFlags.set(f.tab, true);
         if (change === 'new-run') f.agent.currentRunId.set(f.tab, 'new-runtime');
+        if (change === 'new-task-token') f.agent._taskTokens.set(f.tab, 'new-task-token');
         if (change === 'same-text-new-task') f.agent.conversations.get(f.tab).push({ role: 'user', content: 'Inspect the owned test page.' });
         if (change === 'provider-object') f.agent.providerManager.getActive = () => ({ ...f.provider });
         if (change === 'provider-config') f.provider.config.endpoint = 'http://changed.invalid';
